@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:health_up/pages/reset_password_screen_2.dart';
+import 'package:health_up/pages/reset_password/verification_code_screen.dart';
 import 'package:health_up/services/auth_service.dart';
 
 class ResetPasswordScreen extends StatefulWidget {
@@ -83,7 +83,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => ResetPasswordScreen2(email: email),
+                        builder: (_) => VerificationCodeScreen(email: email),
                       ),
                     );
                   }

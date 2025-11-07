@@ -1,9 +1,11 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:health_up/pages/welcome_screen.dart';
-import 'package:health_up/pages/reset_password_screen.dart';
+import 'package:health_up/pages/reset_password/reset_password_screen.dart';
 import 'package:health_up/pages/sign_up_screen.dart';
 import 'package:health_up/services/auth_service.dart';
+import 'package:health_up/services/token_decoder.dart';
+import 'package:health_up/pages/main.dart';
 
 
 class SignInScreen extends StatefulWidget {
@@ -19,7 +21,12 @@ class _SignInScreenState extends State<SignInScreen> {
   bool _isPasswordHidden = true;
   bool _isLoading = false;
 
-  final AuthService _authService = AuthService();
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
 
   void _showSnackBar(String message, {bool error = false}) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -47,18 +54,33 @@ class _SignInScreenState extends State<SignInScreen> {
         password: password,
       );
 
-
       if (result["success"]) {
-        _showSnackBar("Login successful!");
+        final String accessToken = result["accessToken"];
+        final String? userId = TokenService.getUserIdFromToken(accessToken);
+        final String? userName = TokenService.getUserNameFromToken(accessToken);
+
+        if (userId == null || userName == null) {
+          _showSnackBar("Login successful, but failed to read user data.", error: true);
+          return;
+        }
+
+
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => const WelcomeScreen()),
+          MaterialPageRoute(
+            builder: (context) => MainScreen(
+              userId: userId,
+              userName: userName,
+            ),
+          ),
         );
+
       } else {
-        _showSnackBar("Invalid email or password", error: true);
+        final errorMessage = result["message"] ?? "Invalid email or password";
+        _showSnackBar(errorMessage, error: true);
       }
     } catch (e) {
-      _showSnackBar("Error: ${e.toString()}", error: true);
+      _showSnackBar("Network Error: ${e.toString()}", error: true);
     } finally {
       setState(() => _isLoading = false);
     }
