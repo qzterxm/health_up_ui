@@ -1,6 +1,11 @@
+
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'package:health_up/pages/welcome_screen.dart';
+import 'package:health_up/pages/sign_in_screen.dart';
+import 'package:health_up/pages/welcome_data/onboarding_screen.dart';
 import 'package:health_up/services/auth_service.dart';
+import 'package:health_up/services/token_decoder.dart';
+
 class SignUpScreen extends StatefulWidget {
   const SignUpScreen({super.key});
 
@@ -9,66 +14,102 @@ class SignUpScreen extends StatefulWidget {
 }
 
 class _SignUpScreenState extends State<SignUpScreen> {
-  final _nameController = TextEditingController();
   final _emailController = TextEditingController();
+  final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
-
   bool _isPasswordHidden = true;
-  bool _isChecked = false;
   bool _isLoading = false;
 
   @override
   void dispose() {
-    _nameController.dispose();
     _emailController.dispose();
+    _usernameController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
 
-  Future<void> _registerUser() async {
+  void _showSnackBar(String message, {bool error = false}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: error ? Colors.red : Colors.green,
+      ),
+    );
+  }
+
+  Future<void> _handleSignUp() async {
+    final email = _emailController.text.trim();
+    final username = _usernameController.text.trim();
+    final password = _passwordController.text.trim();
+
+    if (email.isEmpty || username.isEmpty || password.isEmpty) {
+      _showSnackBar("Please fill in all fields", error: true);
+      return;
+    }
+
     setState(() => _isLoading = true);
 
-    final result = await AuthService.register(
-      email: _emailController.text.trim(),
-      userName: _nameController.text.trim(),
-      password: _passwordController.text.trim(),
-    );
-
-    setState(() => _isLoading = false);
-
-    if (result["success"]) {
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Registration successful!"),
-          backgroundColor: Colors.green,
-        ),
+    try {
+      final regResult = await AuthService.register(
+        email: email,
+        userName: username,
+        password: password,
       );
 
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const WelcomeScreen()),
-      );
-    } else {
+      if (regResult["success"] != true) {
+        _showSnackBar(regResult["message"] ?? "Registration failed", error: true);
+        setState(() => _isLoading = false);
+        return;
+      }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text("Registration failed: ${result["message"]}"),
-          backgroundColor: Colors.red,
-        ),
+      final loginResult = await AuthService.login(
+        email: email,
+        password: password,
       );
+
+      if (loginResult["success"] == true) {
+        final String accessToken = loginResult["accessToken"];
+        final String? userId = TokenService.getUserIdFromToken(accessToken);
+        final String? userName = TokenService.getUserNameFromToken(accessToken);
+
+        if (userId == null || userName == null) {
+          _showSnackBar("Registration successful, but failed to read user data.", error: true);
+          return;
+        }
+
+        if (!mounted) return;
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => OnboardingScreen(
+              userId: userId,
+              userName: userName,
+            ),
+          ),
+        );
+      } else {
+        _showSnackBar("Registration successful, but auto-login failed.", error: true);
+      }
+    } catch (e) {
+      _showSnackBar("Network Error: ${e.toString()}", error: true);
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.black),
           onPressed: () => Navigator.pushReplacement(
             context,
-            MaterialPageRoute(builder: (context) => const WelcomeScreen()),
+            MaterialPageRoute(builder: (context) => const SignInScreen()),
           ),
         ),
         title: const Text(
@@ -79,32 +120,13 @@ class _SignUpScreenState extends State<SignUpScreen> {
         elevation: 0,
         centerTitle: true,
       ),
-      backgroundColor: Colors.white,
       body: SingleChildScrollView(
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 20.0),
+          padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 32.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
-              const SizedBox(height: 20),
-
-              TextField(
-                controller: _nameController,
-                decoration: InputDecoration(
-                  hintText: 'Enter your name',
-                  prefixIcon:
-                  Icon(Icons.person_outline, color: Colors.grey[600]),
-                  filled: true,
-                  fillColor: Colors.grey[50],
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12.0),
-                    borderSide: BorderSide.none,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16.0),
-
-
+              const SizedBox(height: 32.0),
               TextField(
                 controller: _emailController,
                 keyboardType: TextInputType.emailAddress,
@@ -120,8 +142,21 @@ class _SignUpScreenState extends State<SignUpScreen> {
                 ),
               ),
               const SizedBox(height: 16.0),
-
-
+              TextField(
+                controller: _usernameController,
+                keyboardType: TextInputType.text,
+                decoration: InputDecoration(
+                  hintText: 'Enter your username',
+                  prefixIcon: Icon(Icons.person_outline, color: Colors.grey[600]),
+                  filled: true,
+                  fillColor: Colors.grey[50],
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12.0),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16.0),
               TextField(
                 controller: _passwordController,
                 obscureText: _isPasswordHidden,
@@ -149,68 +184,50 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   ),
                 ),
               ),
-              const SizedBox(height: 24.0),
-
-
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Checkbox(
-                    value: _isChecked,
-                    onChanged: (bool? value) {
-                      setState(() {
-                        _isChecked = value ?? false;
-                      });
-                    },
-                  ),
-                  Expanded(
-                    child: RichText(
-                      text: const TextSpan(
-                        style: TextStyle(fontSize: 14, color: Colors.black87),
-                        children: [
-                          TextSpan(
-                            text:
-                            'I agree to the HealthUp Terms of Service and Privacy Policy',
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 48.0),
-
-
+              const SizedBox(height: 32.0),
               ElevatedButton(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor:
-                  _isChecked ? Colors.blue : Colors.grey.shade400,
+                  backgroundColor: Colors.blue,
                   padding: const EdgeInsets.symmetric(vertical: 16.0),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(30.0),
                   ),
                 ),
-                onPressed: _isChecked && !_isLoading
-                    ? () {
-                  if (_nameController.text.isEmpty ||
-                      _emailController.text.isEmpty ||
-                      _passwordController.text.isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text("Please fill in all fields"),
-                        backgroundColor: Colors.orange,
-                      ),
-                    );
-                  } else {
-                    _registerUser();
-                  }
-                }
-                    : null,
+                onPressed: _isLoading ? null : _handleSignUp,
                 child: _isLoading
                     ? const CircularProgressIndicator(color: Colors.white)
                     : const Text(
                   'Sign Up',
                   style: TextStyle(fontSize: 18, color: Colors.white),
+                ),
+              ),
+              const SizedBox(height: 48.0),
+              Align(
+                alignment: Alignment.center,
+                child: RichText(
+                  text: TextSpan(
+                    style: const TextStyle(
+                        fontSize: 15, color: Colors.black87, height: 1.5),
+                    children: [
+                      const TextSpan(text: "Already have an account? "),
+                      TextSpan(
+                        text: 'Sign in',
+                        style: const TextStyle(
+                          color: Colors.blue,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        recognizer: TapGestureRecognizer()
+                          ..onTap = () {
+                            Navigator.pushReplacement(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const SignInScreen(),
+                              ),
+                            );
+                          },
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ],

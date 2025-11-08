@@ -1,23 +1,74 @@
 import 'package:flutter/material.dart';
+import 'package:health_up/pages/profile/profile_screen.dart';
+import 'package:health_up/pages/reports_screen.dart';
 import 'package:health_up/pages/sign_in_screen.dart';
 import 'package:health_up/services/user_data_service.dart';
-
 import 'add_data/add_data_screen.dart';
 
 void main() {
   runApp(const MyApp());
 }
-
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   const MyApp({super.key});
+
+  @override
+  State<MyApp> createState() => _MyAppState();
+
+  static _MyAppState? of(BuildContext context) =>
+      context.findAncestorStateOfType<_MyAppState>();
+}
+
+class _MyAppState extends State<MyApp> {
+
+  ThemeMode _themeMode = ThemeMode.light;
+
+  void changeTheme(ThemeMode themeMode) {
+    setState(() {
+      _themeMode = themeMode;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Health App',
+
       theme: ThemeData(
         primarySwatch: Colors.blue,
+        brightness: Brightness.light,
+        scaffoldBackgroundColor: Colors.grey[50],
+        appBarTheme: AppBarTheme(
+          backgroundColor: Colors.grey[50],
+          elevation: 0,
+          iconTheme: IconThemeData(color: Colors.grey[800]),
+          titleTextStyle: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: Colors.grey[800],
+          ),
+        ),
+        cardColor: Colors.white,
       ),
+
+      darkTheme: ThemeData(
+        primarySwatch: Colors.blue,
+        brightness: Brightness.dark,
+        scaffoldBackgroundColor: const Color(0xFF121212),
+        appBarTheme: AppBarTheme(
+          backgroundColor: const Color(0xFF121212),
+          elevation: 0,
+          iconTheme: IconThemeData(color: Colors.grey[300]),
+          titleTextStyle: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: Colors.grey[300],
+          ),
+        ),
+        cardColor: const Color(0xFF1E1E1E),
+      ),
+
+      themeMode: _themeMode,
+
       home: const SignInScreen(),
     );
   }
@@ -30,7 +81,7 @@ class MainScreen extends StatefulWidget {
   const MainScreen({
     required this.userId,
     required this.userName,
-    super.key
+    super.key,
   });
 
   @override
@@ -54,16 +105,14 @@ class _MainScreenState extends State<MainScreen> {
     _fetchUserData();
   }
 
-
   Future<void> _fetchUserData() async {
     setState(() {
       _isLoading = true;
       _errorMessage = null;
     });
 
-    final response = await UserDataService.getAverageData(userId: _currentUserId);
-
-
+    final response =
+    await UserDataService.getAverageData(userId: _currentUserId);
 
     if (response["success"] == true) {
       setState(() {
@@ -72,14 +121,14 @@ class _MainScreenState extends State<MainScreen> {
       });
     } else {
       setState(() {
-        _errorMessage = response["message"] ?? 'Failed to load user health data for ID: $_currentUserId. Check server connection/data.';
+        _errorMessage = response["message"] ??
+            'Failed to load user health data for ID: $_currentUserId. Check server connection/data.';
         _isLoading = false;
       });
     }
   }
 
-
-  Widget _buildBody() {
+  Widget _buildHomeBody() {
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -127,7 +176,6 @@ class _MainScreenState extends State<MainScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-
           Text(
             'Smart Health Metrics',
             style: TextStyle(
@@ -137,7 +185,6 @@ class _MainScreenState extends State<MainScreen> {
             ),
           ),
           const SizedBox(height: 16.0),
-
           Container(
             padding: const EdgeInsets.all(16.0),
             decoration: BoxDecoration(
@@ -149,13 +196,11 @@ class _MainScreenState extends State<MainScreen> {
               children: [
                 _buildMetricColumn('Avg. Heart Rate', '$avgHeartRate BPM'),
                 _buildMetricColumn('Avg. BP', '$avgSystolic/$avgDiastolic mmHg'),
-                _buildMetricColumn('IMT', 'imt'),
-
+                _buildMetricColumn('IMT', imt),
               ],
             ),
           ),
           const SizedBox(height: 24.0),
-
           Text(
             'Personal Health Data',
             style: TextStyle(
@@ -165,7 +210,6 @@ class _MainScreenState extends State<MainScreen> {
             ),
           ),
           const SizedBox(height: 16.0),
-
           GridView.count(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
@@ -176,9 +220,14 @@ class _MainScreenState extends State<MainScreen> {
             children: [
               _buildDataCard('Heart Rate', '$latestHeartRate BPM'),
               _buildDataCard('Height', '$latestHeight cm'),
-              _buildDataCard('Blood Group', bloodGroup == 'N/A' || bloodGroup.isEmpty ? 'N/A' : bloodGroup),
+              _buildDataCard('Blood Group',
+                  bloodGroup == 'N/A' || bloodGroup.isEmpty ? 'N/A' : bloodGroup),
               _buildDataCard('Weight', '$latestWeight kg'),
-              _buildDataCard('Sugar Level', latestSugar > 0 ? '${latestSugar.toStringAsFixed(1)} mmol/L' : 'N/A'),
+              _buildDataCard(
+                  'Sugar Level',
+                  latestSugar > 0
+                      ? '${latestSugar.toStringAsFixed(1)} mmol/L'
+                      : 'N/A'),
               _buildAddDataCard(),
             ],
           ),
@@ -214,7 +263,7 @@ class _MainScreenState extends State<MainScreen> {
   Widget _buildDataCard(String title, String value) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.grey[50],
+        color: Colors.white,
         borderRadius: BorderRadius.circular(12.0),
         border: Border.all(color: Colors.grey[200]!),
       ),
@@ -247,14 +296,12 @@ class _MainScreenState extends State<MainScreen> {
   Widget _buildAddDataCard() {
     return InkWell(
       onTap: () async {
-
         final result = await Navigator.push(
           context,
           MaterialPageRoute(
             builder: (context) => AddDataScreen(userId: _currentUserId),
           ),
         );
-
         if (result == true) {
           _fetchUserData();
         }
@@ -281,6 +328,7 @@ class _MainScreenState extends State<MainScreen> {
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
+                color: Colors.blue[800],
               ),
             ),
           ],
@@ -288,38 +336,72 @@ class _MainScreenState extends State<MainScreen> {
       ),
     );
   }
+  Widget _buildPageContent() {
+    switch (_currentIndex) {
+      case 0:
+        return _buildHomeBody();
+      case 1:
+        return const ReportsScreen();
+      case 2:
+        return const Center(child: Text('Графіки приймання ліків???'));
+      case 3:
+        return ProfileScreen(
+          userId: _currentUserId,
+          userName: _currentUserName,
+        );
+      default:
+        return _buildHomeBody();
+    }
+  }
+  Widget _buildAppBarTitle() {
+    switch (_currentIndex) {
+      case 0:
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Hi, $_currentUserName!',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey[800],
+              ),
+            ),
+          ],
+        );
+      case 3:
+        return Text(
+          'My Account',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: Colors.grey[800],
+          ),
+        );
+      default:
+        return Container();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
       appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
         title: Row(
           children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Hi, $_currentUserName!',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.grey[800],
-                  ),
-                ),
-              ],
-            ),
+            _buildAppBarTitle(),
           ],
         ),
         actions: [
           IconButton(
             icon: Icon(Icons.notifications_outlined, color: Colors.grey[700]),
-            onPressed: () {},
+            onPressed: () {
+              // TODO: Handle notification tap
+            },
           ),
         ],
       ),
-      body: _buildBody(),
+      body: _buildPageContent(),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           color: Colors.white,
