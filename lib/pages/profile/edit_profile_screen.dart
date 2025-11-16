@@ -1,13 +1,20 @@
-
 import 'package:flutter/material.dart';
+import 'package:health_up/services/auth_service.dart';
 
 class EditProfileScreen extends StatefulWidget {
+  final String userId;
   final String userName;
   final String userEmail;
+  final Map<String, dynamic>? userData;
+  final VoidCallback? onProfileUpdated;
+
   const EditProfileScreen({
     super.key,
+    required this.userId,
     required this.userName,
     required this.userEmail,
+    this.userData,
+    this.onProfileUpdated,
   });
 
   @override
@@ -15,17 +22,49 @@ class EditProfileScreen extends StatefulWidget {
 }
 
 class _EditProfileScreenState extends State<EditProfileScreen> {
-
   late TextEditingController _fullNameController;
   late TextEditingController _emailController;
   late TextEditingController _dobController;
+  late TextEditingController _phoneController;
+  late TextEditingController _countryController;
+  late TextEditingController _ageController;
+  late TextEditingController _passwordController;
+
+  String? _selectedGender;
+  bool _isSaving = false;
+
+  String formatDateForApi(String input) {
+    // Converts DD/MM/YYYY -> YYYY-MM-DD
+    final parts = input.split('/');
+    if (parts.length != 3) return input;
+    final day = parts[0].padLeft(2, '0');
+    final month = parts[1].padLeft(2, '0');
+    final year = parts[2];
+    return "$year-$month-$day";
+  }
+  final List<String> _genders = ['Male', 'Female'];
 
   @override
   void initState() {
     super.initState();
+
+    // Initialize controllers with user data
     _fullNameController = TextEditingController(text: widget.userName);
     _emailController = TextEditingController(text: widget.userEmail);
-    _dobController = TextEditingController(text: "20/05/2005");
+    _dobController = TextEditingController(
+        text: widget.userData?['dateOfBirth'] ?? "20/05/2005"
+    );
+    _phoneController = TextEditingController(
+        text: widget.userData?['phoneNumber'] ?? ""
+    );
+    _countryController = TextEditingController(
+        text: widget.userData?['country'] ?? ""
+    );
+    _ageController = TextEditingController(
+        text: widget.userData?['age']?.toString() ?? ""
+    );
+    _passwordController = TextEditingController();
+    _selectedGender = widget.userData?['gender'] ?? 'Male';
   }
 
   @override
@@ -33,14 +72,92 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _fullNameController.dispose();
     _emailController.dispose();
     _dobController.dispose();
+    _phoneController.dispose();
+    _countryController.dispose();
+    _ageController.dispose();
+    _passwordController.dispose();
     super.dispose();
   }
 
-  void _saveChanges() {
-    print("Full Name: ${_fullNameController.text}");
-    print("Email: ${_emailController.text}");
-    print("Date of Birth: ${_dobController.text}");
-    Navigator.of(context).pop();
+  Future<void> _saveChanges() async {
+    if (_fullNameController.text.isEmpty || _emailController.text.isEmpty) {
+      _showSnackBar("Please fill in all required fields");
+      return;
+    }
+
+    setState(() => _isSaving = true);
+
+    try {
+      final auth = AuthService();
+
+      // Форматування даних перед відправкою
+      final formattedPhone = _phoneController.text.startsWith('+')
+          ? _phoneController.text
+          : '${_phoneController.text}';
+      final formattedCountry = _countryController.text.trim().isNotEmpty
+          ? '${_countryController.text[0].toUpperCase()}${_countryController.text.substring(1)}'
+          : 'Unknown';
+      final formattedDob = formatDateForApi(_dobController.text);
+      final gender = _selectedGender ?? 'Male';
+
+      final payload = {
+        "id": widget.userId,
+        "email": _emailController.text,
+        "userName": _fullNameController.text,
+        "password": _passwordController.text.isNotEmpty
+            ? _passwordController.text
+            : widget.userData?["password"] ?? "",
+        "gender": gender,
+        "age": int.tryParse(_ageController.text) ?? widget.userData?["age"] ?? 0,
+        "dateOfBirth": formattedDob,
+        "country": formattedCountry,
+        "phoneNumber": formattedPhone,
+        "userRole": widget.userData?["userRole"] ?? "User",
+        "profilePictureUrl": widget.userData?["profilePictureUrl"] ?? "",
+      };
+
+      // 🔹 Логи для перевірки перед відправкою
+      print("=== UPDATE USER PAYLOAD ===");
+      payload.forEach((key, value) => print("$key: $value"));
+      print("============================");
+
+      final result = await auth.updateUser(payload);
+
+      setState(() => _isSaving = false);
+
+      // 🔹 Логи після отримання відповіді
+      print("=== UPDATE USER RESULT ===");
+      print(result);
+      print("===========================");
+
+      if (result) {
+        _showSnackBar("Profile updated successfully!");
+        widget.onProfileUpdated?.call();
+
+        Future.delayed(const Duration(milliseconds: 800), () {
+          if (mounted) Navigator.of(context).pop();
+        });
+      } else {
+        _showSnackBar("Failed to update profile. Check backend logs.");
+      }
+    } catch (e) {
+      setState(() => _isSaving = false);
+      print("=== UPDATE USER ERROR ===");
+      print(e);
+      print("==========================");
+      _showSnackBar("An error occurred: $e");
+    }
+  }
+
+
+
+  void _showSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        duration: const Duration(seconds: 3),
+      ),
+    );
   }
 
   @override
@@ -91,7 +208,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   right: 0,
                   child: GestureDetector(
                     onTap: () {
-                      // TODO:lогіка фото
+                      // TODO: Add photo logic
                       print("Edit photo tapped!");
                     },
                     child: Container(
@@ -110,7 +227,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             const SizedBox(height: 32.0),
 
             _buildInputField(
-              "Full Name",
+              "Full Name *",
               Icons.person_outline,
               _fullNameController,
               isEditable: true,
@@ -118,7 +235,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             const SizedBox(height: 16.0),
 
             _buildInputField(
-              "Email Address",
+              "Email Address *",
               Icons.mail_outline,
               _emailController,
               isEditable: true,
@@ -126,6 +243,34 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             ),
             const SizedBox(height: 16.0),
 
+            _buildInputField(
+              "Phone Number",
+              Icons.phone_outlined,
+              _phoneController,
+              isEditable: true,
+              keyboardType: TextInputType.phone,
+            ),
+            const SizedBox(height: 16.0),
+
+            _buildInputField(
+              "Country",
+              Icons.location_on_outlined,
+              _countryController,
+              isEditable: true,
+            ),
+            const SizedBox(height: 16.0),
+
+            _buildInputField(
+              "Age",
+              Icons.cake_outlined,
+              _ageController,
+              isEditable: true,
+              keyboardType: TextInputType.number,
+            ),
+            const SizedBox(height: 16.0),
+
+            _buildGenderDropdown(),
+            const SizedBox(height: 16.0),
 
             _buildInputField(
               "Date of Birth",
@@ -141,7 +286,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
-                onPressed: _saveChanges,
+                onPressed: _isSaving ? null : _saveChanges,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.blue,
                   padding: const EdgeInsets.symmetric(vertical: 16.0),
@@ -149,10 +294,19 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     borderRadius: BorderRadius.circular(30.0),
                   ),
                 ),
-                icon: const Icon(Icons.check, color: Colors.white),
-                label: const Text(
-                  'Save Changes',
-                  style: TextStyle(fontSize: 18, color: Colors.white),
+                icon: _isSaving
+                    ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  ),
+                )
+                    : const Icon(Icons.check, color: Colors.white),
+                label: Text(
+                  _isSaving ? 'Saving...' : 'Save Changes',
+                  style: const TextStyle(fontSize: 18, color: Colors.white),
                 ),
               ),
             ),
@@ -211,6 +365,54 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     );
   }
 
+  Widget _buildGenderDropdown() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          "Gender",
+          style: TextStyle(
+            color: Colors.grey[700],
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 8.0),
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.grey[100],
+            borderRadius: BorderRadius.circular(12.0),
+          ),
+          child: DropdownButtonFormField<String>(
+            value: _selectedGender,
+            onChanged: (String? newValue) {
+              setState(() {
+                _selectedGender = newValue;
+              });
+            },
+            items: _genders.map((String gender) {
+              return DropdownMenuItem<String>(
+                value: gender,
+                child: Text(gender),
+              );
+            }).toList(),
+            decoration: InputDecoration(
+              prefixIcon: Icon(Icons.transgender, color: Colors.grey[600]),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12.0),
+                borderSide: BorderSide.none,
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                vertical: 14.0,
+                horizontal: 16.0,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   Future<void> _selectDate(BuildContext context) async {
     final DateTime? picked = await showDatePicker(
       context: context,
@@ -221,18 +423,20 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         return Theme(
           data: ThemeData.light().copyWith(
             primaryColor: Colors.blue,
-            buttonTheme:
-            const ButtonThemeData(textTheme: ButtonTextTheme.primary),
+            buttonTheme: const ButtonThemeData(textTheme: ButtonTextTheme.primary),
             colorScheme: const ColorScheme.light(primary: Colors.blue),
           ),
           child: child!,
         );
       },
     );
+
     if (picked != null) {
       setState(() {
+        // Save in DD/MM/YYYY format for display
         _dobController.text = "${picked.day}/${picked.month}/${picked.year}";
       });
     }
   }
+
 }

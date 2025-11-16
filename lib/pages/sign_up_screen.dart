@@ -1,10 +1,11 @@
-
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'package:health_up/pages/sign_in_screen.dart';
-import 'package:health_up/pages/welcome_data/onboarding_screen.dart';
-import 'package:health_up/services/auth_service.dart';
-import 'package:health_up/services/token_decoder.dart';
+import '../services/TokenStorage.dart';
+import '../services/auth_service.dart';
+import '../services/token_decoder.dart';
+
+import 'sign_in_screen.dart';
+import 'welcome_data/onboarding_screen.dart';
 
 class SignUpScreen extends StatefulWidget {
   const SignUpScreen({super.key});
@@ -31,10 +32,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
   void _showSnackBar(String message, {bool error = false}) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: error ? Colors.red : Colors.green,
-      ),
+      SnackBar(content: Text(message), backgroundColor: error ? Colors.red : Colors.green),
     );
   }
 
@@ -59,46 +57,23 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
       if (regResult["success"] != true) {
         _showSnackBar(regResult["message"] ?? "Registration failed", error: true);
-        setState(() => _isLoading = false);
         return;
       }
 
-      final loginResult = await AuthService.login(
-        email: email,
-        password: password,
+      _showSnackBar("Registration successful! Please log in.");
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const SignInScreen()),
       );
 
-      if (loginResult["success"] == true) {
-        final String accessToken = loginResult["accessToken"];
-        final String? userId = TokenService.getUserIdFromToken(accessToken);
-        final String? userName = TokenService.getUserNameFromToken(accessToken);
-
-        if (userId == null || userName == null) {
-          _showSnackBar("Registration successful, but failed to read user data.", error: true);
-          return;
-        }
-
-        if (!mounted) return;
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (context) => OnboardingScreen(
-              userId: userId,
-              userName: userName,
-            ),
-          ),
-        );
-      } else {
-        _showSnackBar("Registration successful, but auto-login failed.", error: true);
-      }
     } catch (e) {
-      _showSnackBar("Network Error: ${e.toString()}", error: true);
+      _showSnackBar("Network error: $e", error: true);
     } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
   }
+
+
 
   @override
   Widget build(BuildContext context) {
@@ -107,131 +82,87 @@ class _SignUpScreenState extends State<SignUpScreen> {
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () => Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (context) => const SignInScreen()),
-          ),
+          onPressed: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const SignInScreen())),
         ),
-        title: const Text(
-          'Sign Up',
-          style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
-        ),
+        title: const Text('Sign Up', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
         backgroundColor: Colors.white,
         elevation: 0,
         centerTitle: true,
       ),
       body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 32.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: <Widget>[
-              const SizedBox(height: 32.0),
-              TextField(
-                controller: _emailController,
-                keyboardType: TextInputType.emailAddress,
-                decoration: InputDecoration(
-                  hintText: 'Enter your email',
-                  prefixIcon: Icon(Icons.mail_outline, color: Colors.grey[600]),
-                  filled: true,
-                  fillColor: Colors.grey[50],
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12.0),
-                    borderSide: BorderSide.none,
-                  ),
-                ),
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const SizedBox(height: 32),
+            TextField(
+              controller: _emailController,
+              keyboardType: TextInputType.emailAddress,
+              decoration: InputDecoration(
+                hintText: 'Enter your email',
+                prefixIcon: Icon(Icons.mail_outline, color: Colors.grey[600]),
+                filled: true,
+                fillColor: Colors.grey[50],
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
               ),
-              const SizedBox(height: 16.0),
-              TextField(
-                controller: _usernameController,
-                keyboardType: TextInputType.text,
-                decoration: InputDecoration(
-                  hintText: 'Enter your username',
-                  prefixIcon: Icon(Icons.person_outline, color: Colors.grey[600]),
-                  filled: true,
-                  fillColor: Colors.grey[50],
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12.0),
-                    borderSide: BorderSide.none,
-                  ),
-                ),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _usernameController,
+              decoration: InputDecoration(
+                hintText: 'Enter your username',
+                prefixIcon: Icon(Icons.person_outline, color: Colors.grey[600]),
+                filled: true,
+                fillColor: Colors.grey[50],
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
               ),
-              const SizedBox(height: 16.0),
-              TextField(
-                controller: _passwordController,
-                obscureText: _isPasswordHidden,
-                decoration: InputDecoration(
-                  hintText: 'Enter your password',
-                  prefixIcon: Icon(Icons.lock_outline, color: Colors.grey[600]),
-                  suffixIcon: IconButton(
-                    icon: Icon(
-                      _isPasswordHidden
-                          ? Icons.visibility_off_outlined
-                          : Icons.visibility_outlined,
-                      color: Colors.grey[600],
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _passwordController,
+              obscureText: _isPasswordHidden,
+              decoration: InputDecoration(
+                hintText: 'Enter your password',
+                prefixIcon: Icon(Icons.lock_outline, color: Colors.grey[600]),
+                suffixIcon: IconButton(
+                  icon: Icon(_isPasswordHidden ? Icons.visibility_off : Icons.visibility, color: Colors.grey[600]),
+                  onPressed: () => setState(() => _isPasswordHidden = !_isPasswordHidden),
+                ),
+                filled: true,
+                fillColor: Colors.grey[50],
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+              ),
+            ),
+            const SizedBox(height: 32),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+              ),
+              onPressed: _isLoading ? null : _handleSignUp,
+              child: _isLoading
+                  ? const CircularProgressIndicator(color: Colors.white)
+                  : const Text('Sign Up', style: TextStyle(fontSize: 18, color: Colors.white)),
+            ),
+            const SizedBox(height: 48),
+            Center(
+              child: RichText(
+                text: TextSpan(
+                  style: const TextStyle(fontSize: 15, color: Colors.black87, height: 1.5),
+                  children: [
+                    const TextSpan(text: "Already have an account? "),
+                    TextSpan(
+                      text: 'Sign in',
+                      style: const TextStyle(color: Colors.blue, fontWeight: FontWeight.bold),
+                      recognizer: TapGestureRecognizer()
+                        ..onTap = () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const SignInScreen())),
                     ),
-                    onPressed: () {
-                      setState(() {
-                        _isPasswordHidden = !_isPasswordHidden;
-                      });
-                    },
-                  ),
-                  filled: true,
-                  fillColor: Colors.grey[50],
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12.0),
-                    borderSide: BorderSide.none,
-                  ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 32.0),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blue,
-                  padding: const EdgeInsets.symmetric(vertical: 16.0),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(30.0),
-                  ),
-                ),
-                onPressed: _isLoading ? null : _handleSignUp,
-                child: _isLoading
-                    ? const CircularProgressIndicator(color: Colors.white)
-                    : const Text(
-                  'Sign Up',
-                  style: TextStyle(fontSize: 18, color: Colors.white),
-                ),
-              ),
-              const SizedBox(height: 48.0),
-              Align(
-                alignment: Alignment.center,
-                child: RichText(
-                  text: TextSpan(
-                    style: const TextStyle(
-                        fontSize: 15, color: Colors.black87, height: 1.5),
-                    children: [
-                      const TextSpan(text: "Already have an account? "),
-                      TextSpan(
-                        text: 'Sign in',
-                        style: const TextStyle(
-                          color: Colors.blue,
-                          fontWeight: FontWeight.bold,
-                        ),
-                        recognizer: TapGestureRecognizer()
-                          ..onTap = () {
-                            Navigator.pushReplacement(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => const SignInScreen(),
-                              ),
-                            );
-                          },
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

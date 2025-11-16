@@ -1,10 +1,9 @@
 
 import 'package:flutter/material.dart';
-import 'package:health_up/pages/main.dart';
 import 'package:health_up/pages/welcome_data/sugar_screen.dart';
 import 'package:health_up/pages/welcome_data/weight_screen.dart';
 import 'package:health_up/services/user_data_service.dart';
-
+import '../../main.dart';
 import 'blood_type_screen.dart';
 import 'height_screen.dart';
 

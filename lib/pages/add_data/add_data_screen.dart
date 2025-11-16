@@ -1,8 +1,6 @@
-
 import 'package:flutter/material.dart';
 import 'package:health_up/pages/add_data/add_anthropometry_screen.dart';
 import 'package:health_up/pages/add_data/add_measurement_screen.dart';
-import 'package:health_up/services/user_data_service.dart';
 
 class AddDataScreen extends StatefulWidget {
   final String userId;

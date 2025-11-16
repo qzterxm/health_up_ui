@@ -1,9 +1,8 @@
-
 import 'package:flutter/material.dart';
 import 'package:health_up/pages/add_data/add_data_screen.dart';
+import 'package:health_up/pages/medication_schedule.dart';
 import 'package:health_up/pages/profile/profile_screen.dart';
-import 'package:health_up/pages/reports_screen.dart';
-import 'package:health_up/pages/sign_in_screen.dart';
+import 'package:health_up/pages/files_screen.dart';
 import 'package:health_up/pages/welcome_screen.dart';
 import 'package:health_up/services/user_data_service.dart';
 
@@ -39,7 +38,12 @@ class _MyAppState extends State<MyApp> {
       theme: ThemeData(
         primarySwatch: Colors.blue,
         brightness: Brightness.light,
-        scaffoldBackgroundColor: Colors.grey[50],
+        scaffoldBackgroundColor: Colors.white,
+        colorScheme: ColorScheme.fromSwatch(
+          primarySwatch: Colors.blue,
+          brightness: Brightness.light,
+        ).copyWith(
+        ),
         appBarTheme: AppBarTheme(
           backgroundColor: Colors.grey[50],
           elevation: 0,
@@ -346,7 +350,9 @@ class _MainScreenState extends State<MainScreen> {
       case 1:
         return const ReportsScreen();
       case 2:
-        return const Center(child: Text('Notification Page (Coming Soon)'));
+        return MedicationSchedule(
+          userId: _currentUserId,
+          );
       case 3:
         return ProfileScreen(
           userId: _currentUserId,
@@ -390,6 +396,7 @@ class _MainScreenState extends State<MainScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: false,
         title: Row(
           children: [
             _buildAppBarTitle(),
@@ -410,7 +417,7 @@ class _MainScreenState extends State<MainScreen> {
           color: Colors.white,
           boxShadow: [
             BoxShadow(
-              color: Colors.grey.withOpacity(0.3),
+              color: Colors.white,
               blurRadius: 10,
               offset: const Offset(0, -2),
             ),
@@ -433,14 +440,14 @@ class _MainScreenState extends State<MainScreen> {
               label: 'Home',
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.bar_chart_outlined),
-              activeIcon: Icon(Icons.bar_chart),
-              label: 'Reports',
+              icon: Icon(Icons.file_copy),
+              activeIcon: Icon(Icons.file_copy),
+              label: 'Files',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.notifications_outlined),
               activeIcon: Icon(Icons.notifications),
-              label: 'Notification',
+              label: 'Schedule',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.person_outlined),

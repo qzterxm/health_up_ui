@@ -1,4 +1,3 @@
-
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 
@@ -39,7 +38,6 @@ class AverageUserData {
       return enumString.replaceAll('_', '').replaceAll('Positive', '+').replaceAll('Negative', '-');
     }
 
-
     return AverageUserData(
       averageHeartRate: (data['averageHeartRate'] as num?)?.toDouble() ?? 0.0,
       averageSystolic: (data['averageSystolic'] as num?)?.toInt() ?? 0,
@@ -69,7 +67,7 @@ class AverageUserData {
 }
 
 class UserDataService {
-  static const String baseUrl = "http://localhost:5299/api/calculation";
+  static const String baseUrl = "https://localhost:7223/api/calculation";
 
   static Future<Map<String, dynamic>> addMeasurement({
     required String userId,
@@ -91,6 +89,7 @@ class UserDataService {
 
     try {
       final response = await http.post(url, headers: headers, body: body);
+
       if (response.statusCode == 200) {
         final decoded = jsonDecode(response.body);
         return {
@@ -102,7 +101,7 @@ class UserDataService {
         final errorBody = jsonDecode(response.body);
         return {
           "success": false,
-          "message": errorBody["message"] ?? "Failed to add measurement: ${response.body}",
+          "message": errorBody["message"] ?? "Failed to add measurement: ${response.statusCode}",
         };
       }
     } catch (e) {
@@ -121,42 +120,38 @@ class UserDataService {
     required double sugar,
     required String bloodType,
   }) async {
-    final url = Uri.parse('$baseUrl/add-anthropometry');
-    final headers = {"Content-Type": "application/json"};
-
-    final body = jsonEncode({
+    final url = Uri.parse('https://localhost:7223/api/calculation/add-anthropometry');
+    final body = {
       "userId": userId,
       "measuredAt": measuredAt.toIso8601String(),
       "weight": weight,
       "height": height.toInt(),
       "sugar": sugar,
       "bloodType": bloodType,
-    });
+    };
+
 
     try {
-      final response = await http.post(url, headers: headers, body: body);
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(body),
+      );
 
-      if (response.statusCode == 200) {
-        final decoded = jsonDecode(response.body);
-        return {
-          "success": true,
-          "message": decoded["message"] ?? "Anthropometry data added successfully",
-          "data": decoded["data"],
-        };
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        return jsonDecode(response.body);
       } else {
-        final errorBody = jsonDecode(response.body);
         return {
           "success": false,
-          "message": errorBody["message"] ?? "Failed to add anthropometry data: ${response.body}",
+          "message": "Server returned status ${response.statusCode}",
+          "data": null,
         };
       }
     } catch (e) {
-      return {
-        "success": false,
-        "message": "An error occurred: $e",
-      };
+      return {"success": false, "message": e.toString(), "data": null};
     }
   }
+
 
   static Future<Map<String, dynamic>> getAverageData({
     required String userId,
@@ -165,6 +160,7 @@ class UserDataService {
 
     try {
       final response = await http.get(url);
+
       if (response.statusCode == 200) {
         final Map<String, dynamic> responseBody = jsonDecode(response.body);
 
@@ -184,7 +180,7 @@ class UserDataService {
         final errorBody = jsonDecode(response.body);
         return {
           "success": false,
-          "message": errorBody["message"] ?? "HTTP Error ${response.statusCode}: ${response.body}",
+          "message": errorBody["message"] ?? "HTTP Error ${response.statusCode}",
         };
       }
     } catch (e) {

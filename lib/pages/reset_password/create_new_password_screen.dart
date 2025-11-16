@@ -165,7 +165,7 @@ class _CreateNewPasswordScreenState extends State<CreateNewPasswordScreen> {
                     );
                     return;
                   }
-                  if (newPassword.length < 12) {
+                  if (newPassword.length < 6) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
                           content: Text(

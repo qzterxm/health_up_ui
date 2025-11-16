@@ -46,41 +46,71 @@ class _AddAnthropometryScreenState extends State<AddAnthropometryScreen> {
       _isLoading = true;
     });
 
-    final result = await UserDataService.addAnthropometry(
-      userId: widget.userId,
-      measuredAt: DateTime.now(),
-      weight: double.parse(_weightController.text),
-      height: double.parse(_heightController.text),
-      sugar: double.parse(_sugarController.text),
-      bloodType: _selectedBloodType,
-    );
+    try {
+      final weight = double.parse(_weightController.text);
+      final height = double.parse(_heightController.text);
+      final sugar = double.parse(_sugarController.text);
 
-    setState(() {
-      _isLoading = false;
-    });
+      // Логи перед запитом
+      debugPrint('=== ADD ANTHROPOMETRY REQUEST ===');
+      debugPrint('UserId: ${widget.userId}');
+      debugPrint('Weight: $weight, Height: $height, Sugar: $sugar');
+      debugPrint('BloodType: $_selectedBloodType');
+      debugPrint('MeasuredAt: ${DateTime.now()}');
 
-    if (result["success"] == true) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(result["message"] ?? "Anthropometry data added successfully!"),
-            backgroundColor: Colors.green,
-          ),
-        );
+      final result = await UserDataService.addAnthropometry(
+        userId: widget.userId,
+        measuredAt: DateTime.now(),
+        weight: weight,
+        height: height,
+        sugar: sugar,
+        bloodType: _selectedBloodType,
+      );
 
-        Navigator.of(context).pop(true);
+      // Лог результату
+      debugPrint('=== ADD ANTHROPOMETRY RESPONSE ===');
+      debugPrint(result.toString());
+
+      if (result["success"] == true) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(result["message"] ?? "Anthropometry data added successfully!"),
+              backgroundColor: Colors.green,
+            ),
+          );
+          Navigator.of(context).pop(true);
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(result["message"] ?? "Failed to add anthropometry data"),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       }
-    } else {
+    } catch (e, stackTrace) {
+      debugPrint('=== ADD ANTHROPOMETRY ERROR ===');
+      debugPrint(e.toString());
+      debugPrint(stackTrace.toString());
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(result["message"] ?? "Failed to add anthropometry data"),
+            content: Text('Unexpected error occurred: $e'),
             backgroundColor: Colors.red,
           ),
         );
       }
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
     }
   }
+
 
   @override
   Widget build(BuildContext context) {
