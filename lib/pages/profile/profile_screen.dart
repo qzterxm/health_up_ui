@@ -1,8 +1,12 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:health_up/main.dart';
 import 'package:health_up/pages/profile/security_screen.dart';
 import 'package:health_up/pages/welcome_screen.dart';
 import 'package:health_up/services/auth_service.dart';
+import '../about_screen.dart';
+import '../help_centre_screen.dart';
 import 'edit_profile_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -45,9 +49,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
           _userData = result["data"];
         } else {
           _errorMessage = result["message"] ?? "Failed to load user data";
-          // Provide default data to prevent null errors
           _userData = {
-            'email': "email@gmail.com", // Use default email instead of widget.userEmail
+            'email': "email@gmail.com",
             'userName': widget.userName,
             'gender': 'Not specified',
             'age': 0,
@@ -62,9 +65,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
       setState(() {
         _isLoading = false;
         _errorMessage = "Unexpected error: $e";
-        // Provide default data
-        _userData = {
-          'email': "email@gmail.com", // Use default email instead of widget.userEmail
+               _userData = {
+          'email': "email@gmail.com",
           'userName': widget.userName,
           'gender': 'Not specified',
           'age': 0,
@@ -87,6 +89,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String get _userPhone => _userData?['phoneNumber']?.toString() ?? 'Not specified';
   String get _userRole => _userData?['userRole']?.toString() ?? 'User';
 
+
+  ImageProvider? _getAvatarImage() {
+    final String? picUrl = _userData?["profilePictureUrl"];
+
+    if (picUrl != null && picUrl.isNotEmpty) {
+      if (picUrl.startsWith('http')) {
+        return NetworkImage(picUrl);
+      } else {
+        try {
+          return MemoryImage(base64Decode(picUrl));
+        } catch (e) {
+          return null;
+        }
+      }
+    }
+    return null;
+  }
+
   void _showEditProfileSheet() {
     showModalBottomSheet(
       context: context,
@@ -101,7 +121,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             userName: _userName,
             userEmail: _userEmail,
             userData: _userData,
-            onProfileUpdated: _loadUserData, // Callback to refresh data
+            onProfileUpdated: _loadUserData,
           ),
         );
       },
@@ -244,12 +264,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   Icons.info_outline,
                   onTap: _showUserDetailsDialog,
                 ),
-                _buildSettingsTile("Notification", Icons.notifications_outlined),
-                _buildSettingsTile("Preferences", Icons.settings_outlined),
                 _buildSettingsTile(
                   "Security",
                   Icons.lock_outline,
-                  onTap: _showSecurityScreen, // ← Add this line!
+                  onTap: _showSecurityScreen,
                 ),
               ],
             ),
@@ -272,16 +290,37 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
               ],
             ),
+
             const SizedBox(height: 24.0),
             _buildSectionHeader("Help & Support"),
             const SizedBox(height: 8.0),
             _buildSettingsList(
               [
-                _buildSettingsTile("About", Icons.info_outline),
-                _buildSettingsTile("Help Center", Icons.help_outline),
+                _buildSettingsTile(
+                  "About",
+                  Icons.info_outline,
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const AboutScreen()),
+                    );
+                  },
+                ),
+
+                _buildSettingsTile(
+                  "Help Center",
+                  Icons.help_outline,
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const HelpCenterScreen()),
+                    );
+                  },
+                ),
               ],
             ),
             const SizedBox(height: 24.0),
+
             _buildSectionHeader("Account"),
             const SizedBox(height: 8.0),
             _buildSettingsList(
@@ -305,6 +344,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _buildUserInfoCard(String name, String email) {
+    final avatarImage = _getAvatarImage();
+
     return Container(
       padding: const EdgeInsets.all(16.0),
       decoration: BoxDecoration(
@@ -316,40 +357,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
           CircleAvatar(
             radius: 30.0,
             backgroundColor: Colors.white.withOpacity(0.3),
-            child: Icon(
-              Icons.person,
-              color: Colors.white,
-              size: 30,
-            ),
+            backgroundImage: avatarImage,
+            child: avatarImage == null
+                ? const Icon(Icons.person, color: Colors.white, size: 30)
+                : null,
           ),
           const SizedBox(width: 16.0),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  name,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 18,
-                  ),
-                ),
-                Text(
-                  email,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 14,
-                  ),
-                ),
-                if (_userRole.isNotEmpty)
-                  Text(
-                    _userRole,
-                    style: TextStyle(
-                      color: Colors.white.withOpacity(0.8),
-                      fontSize: 12,
-                    ),
-                  ),
+                Text(name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
+                Text(email, style: const TextStyle(color: Colors.white, fontSize: 14)),
               ],
             ),
           ),
@@ -366,7 +385,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Text(
       title,
       style: TextStyle(
-        color: Colors.grey[700],
+        color: Theme.of(context).textTheme.bodyLarge?.color?.withOpacity(0.7),
         fontWeight: FontWeight.bold,
         fontSize: 16,
       ),
@@ -378,7 +397,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
       decoration: BoxDecoration(
         color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(12.0),
-        border: Border.all(color: Colors.grey[200]!),
+        border: Border.all(
+          color: Theme.of(context).dividerColor.withOpacity(0.1),
+        ),
       ),
       child: Column(
         children: tiles.asMap().entries.map((entry) {
@@ -388,7 +409,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
             children: [
               tile,
               if (idx < tiles.length - 1)
-                const Divider(height: 1, indent: 16, endIndent: 16),
+                Divider(
+                  height: 1,
+                  indent: 16,
+                  endIndent: 16,
+                  color: Theme.of(context).dividerColor,
+                ),
             ],
           );
         }).toList(),
@@ -405,18 +431,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ValueChanged<bool>? onToggle,
       }) {
     return ListTile(
-      leading: Icon(icon, color: Colors.grey[600]),
-      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w500)),
+      leading: Icon(icon, color: Theme.of(context).iconTheme.color),
+      title: Text(
+        title,
+        style: TextStyle(
+          fontWeight: FontWeight.w500,
+          color: Theme.of(context).textTheme.bodyLarge?.color,
+        ),
+      ),
       trailing: hasToggle
           ? Switch(
         value: isToggled,
         onChanged: onToggle,
-        activeColor: Colors.blue,
+        activeColor: Colors.white,
+        activeTrackColor: Theme.of(context).colorScheme.primary,
+        inactiveThumbColor: Colors.white,
+        inactiveTrackColor: Colors.blue[400],
       )
           : Icon(
         Icons.arrow_forward_ios,
         size: 16.0,
-        color: Colors.grey[600],
+        color: Theme.of(context).iconTheme.color,
       ),
       onTap: hasToggle ? null : onTap,
     );
@@ -442,7 +477,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     builder: (context) => const WelcomeScreen(),
                   ),
                 );
-                print("Logout pressed");
               },
               child: const Text(
                 "Logout",

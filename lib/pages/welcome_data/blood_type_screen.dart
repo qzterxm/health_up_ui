@@ -1,4 +1,3 @@
-
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
@@ -25,16 +24,24 @@ class OnboardingPageBloodType extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.center,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Text(
+        Text(
           "What's your official\nblood type?",
           textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+          style: TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+            color: Theme.of(context).textTheme.bodyLarge?.color,
+          ),
         ),
         const SizedBox(height: 16),
         Text(
           "$initialType$initialRh",
           textAlign: TextAlign.center,
-          style: const TextStyle(fontSize: 64, fontWeight: FontWeight.bold, color: Colors.blue),
+          style: TextStyle(
+            fontSize: 64,
+            fontWeight: FontWeight.bold,
+            color: Theme.of(context).colorScheme.primary,
+          ),
         ),
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -52,7 +59,13 @@ class OnboardingPageBloodType extends StatelessWidget {
                 },
                 children: typeMap.keys.map((type) {
                   return Center(
-                    child: Text(type, style: const TextStyle(fontSize: 28)),
+                    child: Text(
+                      type,
+                      style: TextStyle(
+                        fontSize: 28,
+                        color: Theme.of(context).textTheme.bodyLarge?.color,
+                      ),
+                    ),
                   );
                 }).toList(),
               ),
@@ -70,7 +83,13 @@ class OnboardingPageBloodType extends StatelessWidget {
                 },
                 children: rhMap.keys.map((rh) {
                   return Center(
-                    child: Text(rh, style: const TextStyle(fontSize: 28)),
+                    child: Text(
+                      rh,
+                      style: TextStyle(
+                        fontSize: 28,
+                        color: Theme.of(context).textTheme.bodyLarge?.color,
+                      ),
+                    ),
                   );
                 }).toList(),
               ),

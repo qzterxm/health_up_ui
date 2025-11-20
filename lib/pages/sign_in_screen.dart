@@ -34,10 +34,11 @@ class _SignInScreenState extends State<SignInScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor: error ? Colors.red : Colors.green,
+        backgroundColor: error ? Colors.red : Theme.of(context).colorScheme.primary,
       ),
     );
   }
+
   Future<void> _handleLogin() async {
     final email = _emailController.text.trim();
     final password = _passwordController.text.trim();
@@ -89,24 +90,31 @@ class _SignInScreenState extends State<SignInScreen> {
     }
   }
 
-
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          icon: Icon(
+              Icons.arrow_back,
+              color: Theme.of(context).iconTheme.color
+          ),
           onPressed: () => Navigator.pushReplacement(
             context,
             MaterialPageRoute(builder: (_) => const WelcomeScreen()),
           ),
         ),
-        title: const Text(
+        title: Text(
           'Sign In',
-          style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+          style: TextStyle(
+              color: Theme.of(context).textTheme.titleLarge?.color,
+              fontWeight: FontWeight.bold
+          ),
         ),
-        backgroundColor: Colors.white,
+        backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
         elevation: 0,
         centerTitle: true,
       ),
@@ -116,43 +124,94 @@ class _SignInScreenState extends State<SignInScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const SizedBox(height: 32),
+
+
             TextField(
               controller: _emailController,
               keyboardType: TextInputType.emailAddress,
+              style: TextStyle(
+                color: Theme.of(context).textTheme.bodyLarge?.color,
+              ),
               decoration: InputDecoration(
                 hintText: 'Enter your email',
-                prefixIcon: Icon(Icons.mail_outline, color: Colors.grey[600]),
+                hintStyle: TextStyle(
+                  color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.6),
+                ),
+                prefixIcon: Icon(
+                  Icons.mail_outline,
+                  color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.6),
+                ),
                 filled: true,
-                fillColor: Colors.grey[50],
+                fillColor: Theme.of(context).cardColor,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide.none,
                 ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(
+                    color: Theme.of(context).dividerColor.withOpacity(0.3),
+                  ),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(
+                    color: Theme.of(context).colorScheme.primary,
+                    width: 2,
+                  ),
+                ),
               ),
             ),
+
             const SizedBox(height: 16),
+
             TextField(
               controller: _passwordController,
               obscureText: _isPasswordHidden,
+              style: TextStyle(
+                color: Theme.of(context).textTheme.bodyLarge?.color,
+              ),
               decoration: InputDecoration(
                 hintText: 'Enter your password',
-                prefixIcon: Icon(Icons.lock_outline, color: Colors.grey[600]),
+                hintStyle: TextStyle(
+                  color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.6),
+                ),
+                prefixIcon: Icon(
+                  Icons.lock_outline,
+                  color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.6),
+                ),
                 suffixIcon: IconButton(
                   icon: Icon(
                     _isPasswordHidden ? Icons.visibility_off : Icons.visibility,
-                    color: Colors.grey[600],
+                    color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.6),
                   ),
                   onPressed: () => setState(() => _isPasswordHidden = !_isPasswordHidden),
                 ),
                 filled: true,
-                fillColor: Colors.grey[50],
+                fillColor: Theme.of(context).cardColor,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide.none,
                 ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(
+                    color: Theme.of(context).dividerColor.withOpacity(0.3),
+                  ),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(
+                    color: Theme.of(context).colorScheme.primary,
+                    width: 2,
+                  ),
+                ),
               ),
             ),
+
             const SizedBox(height: 16),
+
+
             Align(
               alignment: Alignment.centerRight,
               child: TextButton(
@@ -160,31 +219,61 @@ class _SignInScreenState extends State<SignInScreen> {
                   context,
                   MaterialPageRoute(builder: (_) => const ResetPasswordScreen()),
                 ),
-                child: const Text("Forgot password?", style: TextStyle(color: Colors.blue)),
+                child: Text(
+                  "Forgot password?",
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                ),
               ),
             ),
+
             const SizedBox(height: 32),
+
+
             ElevatedButton(
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue,
+                backgroundColor: Theme.of(context).colorScheme.primary,
+                foregroundColor: Theme.of(context).colorScheme.onPrimary,
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                elevation: 2,
               ),
               onPressed: _isLoading ? null : _handleLogin,
               child: _isLoading
-                  ? const CircularProgressIndicator(color: Colors.white)
-                  : const Text('Sign In', style: TextStyle(fontSize: 18, color: Colors.white)),
+                  ? const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Colors.white,
+                ),
+              )
+                  : const Text(
+                'Sign In',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+              ),
             ),
+
             const SizedBox(height: 48),
+
+
             Center(
               child: RichText(
                 text: TextSpan(
-                  style: const TextStyle(fontSize: 15, color: Colors.black87, height: 1.5),
+                  style: TextStyle(
+                    fontSize: 15,
+                    color: Theme.of(context).textTheme.bodyMedium?.color,
+                    height: 1.5,
+                  ),
                   children: [
-                    const TextSpan(text: "Don't have an account? "),
+                    TextSpan(text: "Don't have an account? "),
                     TextSpan(
                       text: 'Sign up',
-                      style: const TextStyle(color: Colors.blue, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                          color: Theme.of(context).colorScheme.primary,
+                          fontWeight: FontWeight.bold
+                      ),
                       recognizer: TapGestureRecognizer()
                         ..onTap = () => Navigator.pushReplacement(
                           context,

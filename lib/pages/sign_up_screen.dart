@@ -1,6 +1,6 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import '../services/TokenStorage.dart';
+import 'package:health_up/pages/welcome_screen.dart';
 import '../services/auth_service.dart';
 import '../services/token_decoder.dart';
 
@@ -32,7 +32,10 @@ class _SignUpScreenState extends State<SignUpScreen> {
   void _showSnackBar(String message, {bool error = false}) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: error ? Colors.red : Colors.green),
+      SnackBar(
+        content: Text(message),
+        backgroundColor: error ? Colors.red : Theme.of(context).colorScheme.primary,
+      ),
     );
   }
 
@@ -60,11 +63,43 @@ class _SignUpScreenState extends State<SignUpScreen> {
         return;
       }
 
-      _showSnackBar("Registration successful! Please log in.");
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const SignInScreen()),
+      final loginResult = await AuthService.login(
+        email: email,
+        password: password,
       );
+
+      if (loginResult["success"] == true && loginResult["data"] != null) {
+        final data = loginResult["data"];
+        await AuthService.saveTokens(
+            data["accessToken"],
+            data["refreshToken"],
+            data["expiresAt"]
+        );
+
+        final userId = TokenService.getUserIdFromToken(data["accessToken"]) ?? "";
+        final userName = username;
+
+        if (mounted) {
+
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (_) => OnboardingScreen(
+                userId: userId,
+                userName: userName,
+              ),
+            ),
+          );
+        }
+      } else {
+        if (mounted) {
+          _showSnackBar("Account created. Please log in manually.");
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const SignInScreen()),
+          );
+        }
+      }
 
     } catch (e) {
       _showSnackBar("Network error: $e", error: true);
@@ -73,19 +108,29 @@ class _SignUpScreenState extends State<SignUpScreen> {
     }
   }
 
-
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const SignInScreen())),
+          icon: Icon(
+              Icons.arrow_back,
+              color: Theme.of(context).iconTheme.color
+          ),
+          onPressed: () => Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (_) => const WelcomeScreen())
+          ),
         ),
-        title: const Text('Sign Up', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
-        backgroundColor: Colors.white,
+        title: Text(
+          'Sign Up',
+          style: TextStyle(
+              color: Theme.of(context).textTheme.titleLarge?.color,
+              fontWeight: FontWeight.bold
+          ),
+        ),
+        backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
         elevation: 0,
         centerTitle: true,
       ),
@@ -95,68 +140,182 @@ class _SignUpScreenState extends State<SignUpScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const SizedBox(height: 32),
+
+
             TextField(
               controller: _emailController,
               keyboardType: TextInputType.emailAddress,
+              style: TextStyle(
+                color: Theme.of(context).textTheme.bodyLarge?.color,
+              ),
               decoration: InputDecoration(
                 hintText: 'Enter your email',
-                prefixIcon: Icon(Icons.mail_outline, color: Colors.grey[600]),
+                hintStyle: TextStyle(
+                  color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.6),
+                ),
+                prefixIcon: Icon(
+                  Icons.mail_outline,
+                  color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.6),
+                ),
                 filled: true,
-                fillColor: Colors.grey[50],
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                fillColor: Theme.of(context).cardColor,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(
+                    color: Theme.of(context).dividerColor.withOpacity(0.3),
+                  ),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(
+                    color: Theme.of(context).colorScheme.primary,
+                    width: 2,
+                  ),
+                ),
               ),
             ),
+
             const SizedBox(height: 16),
+
+
             TextField(
               controller: _usernameController,
+              style: TextStyle(
+                color: Theme.of(context).textTheme.bodyLarge?.color,
+              ),
               decoration: InputDecoration(
                 hintText: 'Enter your username',
-                prefixIcon: Icon(Icons.person_outline, color: Colors.grey[600]),
+                hintStyle: TextStyle(
+                  color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.6),
+                ),
+                prefixIcon: Icon(
+                  Icons.person_outline,
+                  color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.6),
+                ),
                 filled: true,
-                fillColor: Colors.grey[50],
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                fillColor: Theme.of(context).cardColor,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(
+                    color: Theme.of(context).dividerColor.withOpacity(0.3),
+                  ),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(
+                    color: Theme.of(context).colorScheme.primary,
+                    width: 2,
+                  ),
+                ),
               ),
             ),
+
             const SizedBox(height: 16),
+
+
             TextField(
               controller: _passwordController,
               obscureText: _isPasswordHidden,
+              style: TextStyle(
+                color: Theme.of(context).textTheme.bodyLarge?.color,
+              ),
               decoration: InputDecoration(
                 hintText: 'Enter your password',
-                prefixIcon: Icon(Icons.lock_outline, color: Colors.grey[600]),
+                hintStyle: TextStyle(
+                  color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.6),
+                ),
+                prefixIcon: Icon(
+                  Icons.lock_outline,
+                  color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.6),
+                ),
                 suffixIcon: IconButton(
-                  icon: Icon(_isPasswordHidden ? Icons.visibility_off : Icons.visibility, color: Colors.grey[600]),
+                  icon: Icon(
+                    _isPasswordHidden ? Icons.visibility_off : Icons.visibility,
+                    color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.6),
+                  ),
                   onPressed: () => setState(() => _isPasswordHidden = !_isPasswordHidden),
                 ),
                 filled: true,
-                fillColor: Colors.grey[50],
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                fillColor: Theme.of(context).cardColor,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(
+                    color: Theme.of(context).dividerColor.withOpacity(0.3),
+                  ),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(
+                    color: Theme.of(context).colorScheme.primary,
+                    width: 2,
+                  ),
+                ),
               ),
             ),
+
             const SizedBox(height: 32),
+
+
             ElevatedButton(
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue,
+                backgroundColor: Theme.of(context).colorScheme.primary,
+                foregroundColor: Theme.of(context).colorScheme.onPrimary,
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                elevation: 2,
               ),
               onPressed: _isLoading ? null : _handleSignUp,
               child: _isLoading
-                  ? const CircularProgressIndicator(color: Colors.white)
-                  : const Text('Sign Up', style: TextStyle(fontSize: 18, color: Colors.white)),
+                  ? const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Colors.white,
+                ),
+              )
+                  : const Text(
+                'Sign Up',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+              ),
             ),
+
             const SizedBox(height: 48),
+
+
             Center(
               child: RichText(
                 text: TextSpan(
-                  style: const TextStyle(fontSize: 15, color: Colors.black87, height: 1.5),
+                  style: TextStyle(
+                    fontSize: 15,
+                    color: Theme.of(context).textTheme.bodyMedium?.color,
+                    height: 1.5,
+                  ),
                   children: [
-                    const TextSpan(text: "Already have an account? "),
+                    TextSpan(text: "Already have an account? "),
                     TextSpan(
                       text: 'Sign in',
-                      style: const TextStyle(color: Colors.blue, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                          color: Theme.of(context).colorScheme.primary,
+                          fontWeight: FontWeight.bold
+                      ),
                       recognizer: TapGestureRecognizer()
-                        ..onTap = () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const SignInScreen())),
+                        ..onTap = () => Navigator.pushReplacement(
+                            context,
+                            MaterialPageRoute(builder: (_) => const SignInScreen())
+                        ),
                     ),
                   ],
                 ),

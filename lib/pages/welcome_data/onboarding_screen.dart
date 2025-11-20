@@ -1,9 +1,9 @@
-
 import 'package:flutter/material.dart';
 import 'package:health_up/pages/welcome_data/sugar_screen.dart';
 import 'package:health_up/pages/welcome_data/weight_screen.dart';
 import 'package:health_up/services/user_data_service.dart';
 import '../../main.dart';
+import 'age_screen.dart';
 import 'blood_type_screen.dart';
 import 'height_screen.dart';
 
@@ -25,8 +25,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   final PageController _pageController = PageController();
   int _currentPage = 0;
   bool _isLoading = false;
-  final int _numPages = 4;
+  final int _numPages = 5;
 
+  int _age = 16;
   int _weight = 70;
   int _height = 170;
   double _sugar = 5.5;
@@ -38,7 +39,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor: error ? Colors.red : Colors.green,
+        backgroundColor: error ? Theme.of(context).colorScheme.error : Colors.green,
+        behavior: SnackBarBehavior.floating,
       ),
     );
   }
@@ -86,29 +88,33 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       height: _height.toDouble(),
       sugar: _sugar,
       bloodType: bloodTypeString,
+      age: _age,
     );
 
     setState(() => _isLoading = false);
 
     if (response['success'] == true) {
-      _showSnackBar("Data saved successfully!", error: false);
       _skipOnboarding();
     } else {
       _showSnackBar(response['message'] ?? "Failed to save data");
     }
   }
 
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         elevation: 0,
         leading: _currentPage == 0
             ? null
             : IconButton(
-          icon: const Icon(Icons.arrow_back_ios, color: Colors.black),
+          icon: Icon(
+            Icons.arrow_back_ios,
+            color: Theme.of(context).iconTheme.color,
+          ),
           onPressed: () => _pageController.previousPage(
             duration: const Duration(milliseconds: 300),
             curve: Curves.easeIn,
@@ -117,7 +123,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         actions: [
           TextButton(
             onPressed: _skipOnboarding,
-            child: const Text('Skip', style: TextStyle(color: Colors.grey)),
+            child: Text(
+              'Skip',
+              style: TextStyle(
+                color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.6),
+              ),
+            ),
           ),
         ],
       ),
@@ -132,7 +143,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     margin: const EdgeInsets.symmetric(horizontal: 4.0),
                     height: 4.0,
                     decoration: BoxDecoration(
-                      color: _currentPage >= index ? Colors.blue : Colors.grey[300],
+                      color: _currentPage >= index
+                          ? Theme.of(context).colorScheme.primary
+                          : Theme.of(context).dividerColor,
                       borderRadius: BorderRadius.circular(2.0),
                     ),
                   ),
@@ -140,12 +153,17 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               }),
             ),
 
+
             Expanded(
               child: PageView(
                 controller: _pageController,
                 onPageChanged: _onPageChanged,
                 physics: const NeverScrollableScrollPhysics(),
                 children: [
+                  OnboardingPageAge(
+                    initialAge: _age,
+                    onAgeChanged: (val) => setState(() => _age = val),
+                  ),
                   OnboardingPageWeight(
                     initialWeight: _weight,
                     onWeightChanged: (val) => setState(() => _weight = val),
@@ -172,18 +190,30 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               padding: const EdgeInsets.symmetric(vertical: 32.0),
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blue,
+                  backgroundColor: Theme.of(context).colorScheme.primary,
+                  foregroundColor: Theme.of(context).colorScheme.onPrimary,
                   minimumSize: const Size(double.infinity, 50),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(30.0),
                   ),
+                  elevation: 2,
                 ),
                 onPressed: _isLoading ? null : _nextPage,
                 child: _isLoading
-                    ? const CircularProgressIndicator(color: Colors.white)
+                    ? SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Theme.of(context).colorScheme.onPrimary,
+                  ),
+                )
                     : Text(
                   _currentPage == _numPages - 1 ? 'Finish' : 'Continue',
-                  style: const TextStyle(fontSize: 18, color: Colors.white),
+                  style: TextStyle(
+                    fontSize: 18,
+                    color: Theme.of(context).colorScheme.onPrimary,
+                  ),
                 ),
               ),
             ),

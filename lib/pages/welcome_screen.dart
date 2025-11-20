@@ -15,11 +15,11 @@ class WelcomeScreen extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
             Image.asset(
-              'assets/images/logo.jpg',
+              'assets/images/logo.png',
               height: 100,
             ),
             const Text(
-              'Healthcare',
+              'HealthUp',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 30,

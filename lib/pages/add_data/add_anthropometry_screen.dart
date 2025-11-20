@@ -51,13 +51,6 @@ class _AddAnthropometryScreenState extends State<AddAnthropometryScreen> {
       final height = double.parse(_heightController.text);
       final sugar = double.parse(_sugarController.text);
 
-      // Логи перед запитом
-      debugPrint('=== ADD ANTHROPOMETRY REQUEST ===');
-      debugPrint('UserId: ${widget.userId}');
-      debugPrint('Weight: $weight, Height: $height, Sugar: $sugar');
-      debugPrint('BloodType: $_selectedBloodType');
-      debugPrint('MeasuredAt: ${DateTime.now()}');
-
       final result = await UserDataService.addAnthropometry(
         userId: widget.userId,
         measuredAt: DateTime.now(),
@@ -67,9 +60,6 @@ class _AddAnthropometryScreenState extends State<AddAnthropometryScreen> {
         bloodType: _selectedBloodType,
       );
 
-      // Лог результату
-      debugPrint('=== ADD ANTHROPOMETRY RESPONSE ===');
-      debugPrint(result.toString());
 
       if (result["success"] == true) {
         if (mounted) {
@@ -92,7 +82,6 @@ class _AddAnthropometryScreenState extends State<AddAnthropometryScreen> {
         }
       }
     } catch (e, stackTrace) {
-      debugPrint('=== ADD ANTHROPOMETRY ERROR ===');
       debugPrint(e.toString());
       debugPrint(stackTrace.toString());
 
@@ -132,7 +121,6 @@ class _AddAnthropometryScreenState extends State<AddAnthropometryScreen> {
               ),
               const SizedBox(height: 16.0),
 
-              // Weight Input
               TextFormField(
                 controller: _weightController,
                 decoration: const InputDecoration(
@@ -154,7 +142,6 @@ class _AddAnthropometryScreenState extends State<AddAnthropometryScreen> {
               ),
               const SizedBox(height: 16.0),
 
-              // Height Input
               TextFormField(
                 controller: _heightController,
                 decoration: const InputDecoration(
@@ -176,7 +163,6 @@ class _AddAnthropometryScreenState extends State<AddAnthropometryScreen> {
               ),
               const SizedBox(height: 16.0),
 
-              // Sugar Level Input
               TextFormField(
                 controller: _sugarController,
                 decoration: const InputDecoration(
@@ -198,7 +184,6 @@ class _AddAnthropometryScreenState extends State<AddAnthropometryScreen> {
               ),
               const SizedBox(height: 16.0),
 
-              // Blood Type Dropdown
               DropdownButtonFormField<String>(
                 value: _selectedBloodType,
                 decoration: const InputDecoration(

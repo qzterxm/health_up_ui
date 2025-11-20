@@ -61,7 +61,6 @@ class _SecurityScreenState extends State<SecurityScreen> {
     setState(() => _isSavingPassword = true);
 
     try {
-      // 1. Get current user data
       final profileResult = await AuthService.getUserProfile(widget.userId);
       if (profileResult['success'] != true) {
         setState(() => _isSavingPassword = false);
@@ -71,7 +70,6 @@ class _SecurityScreenState extends State<SecurityScreen> {
 
       final userData = profileResult['data'] ?? {};
 
-      // 2. Verify current password
       final loginResult = await AuthService.login(
         email: userData['email'],
         password: _currentPasswordController.text,
@@ -83,13 +81,12 @@ class _SecurityScreenState extends State<SecurityScreen> {
         return;
       }
 
-      // 3. Prepare user object with only password updated
       final auth = AuthService();
       final updatedUser = {
         "id": widget.userId,
-        "email": userData['email'], // keep current email
+        "email": userData['email'],
         "userName": userData['userName'] ?? 'user',
-        "password": _newPasswordController.text, // new password
+        "password": _newPasswordController.text,
         "gender": userData['gender'] ?? 'Male',
         "age": userData['age'] ?? 0,
         "dateOfBirth": userData['dateOfBirth'] ?? '2000-01-01',
@@ -99,7 +96,7 @@ class _SecurityScreenState extends State<SecurityScreen> {
         "profilePictureUrl": userData['profilePictureUrl'] ?? '',
       };
 
-      // 4. Call update-user endpoint
+
       final result = await auth.updateUser(updatedUser);
 
       setState(() => _isSavingPassword = false);
@@ -136,7 +133,6 @@ class _SecurityScreenState extends State<SecurityScreen> {
 
       final userData = profileResult['data'] ?? {};
 
-      // Ask for current password
       final password = await _showPasswordDialog();
       if (password == null) {
         setState(() => _isSavingEmail = false);
@@ -157,9 +153,9 @@ class _SecurityScreenState extends State<SecurityScreen> {
       final auth = AuthService();
       final updatedUser = {
         "id": widget.userId,
-        "email": _emailController.text, // new email
+        "email": _emailController.text,
         "userName": userData['userName'] ?? 'user',
-        "password": password, // current password
+        "password": password,
         "gender": userData['gender'] ?? 'Male',
         "age": userData['age'] ?? 0,
         "dateOfBirth": userData['dateOfBirth'] ?? '2000-01-01',
@@ -263,11 +259,10 @@ class _SecurityScreenState extends State<SecurityScreen> {
     if (deleteResult) {
       _showSnackBar('Your account has been deleted.');
 
-      // Clear saved tokens/preferences
       final prefs = await SharedPreferences.getInstance();
       await prefs.clear();
 
-      // Redirect to WelcomeScreen and remove SecurityScreen from stack
+
       if (!mounted) return;
       Navigator.pushReplacement(
         context,
@@ -403,8 +398,6 @@ class _SecurityScreenState extends State<SecurityScreen> {
                   ?.copyWith(fontWeight: FontWeight.bold, color: Colors.grey[800]),
             ),
             const SizedBox(height: 24),
-
-            // Change Password Section
             _buildSectionHeader("Change Password"),
             const SizedBox(height: 16),
             _buildPasswordField(
@@ -475,7 +468,6 @@ class _SecurityScreenState extends State<SecurityScreen> {
             const Divider(),
             const SizedBox(height: 32),
 
-            // Change Email Section
             _buildSectionHeader("Change Email Address"),
             const SizedBox(height: 16),
             _buildInputField("New Email Address", Icons.mail_outline, _emailController,
@@ -513,7 +505,6 @@ class _SecurityScreenState extends State<SecurityScreen> {
             const Divider(),
             const SizedBox(height: 32),
 
-            // Delete Account Section
             _buildSectionHeader("Delete Account"),
             const SizedBox(height: 16),
             SizedBox(

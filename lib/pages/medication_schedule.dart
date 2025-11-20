@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons/lucide_icons.dart';
+import 'package:table_calendar/table_calendar.dart';
 import '../services/medication_service.dart';
 import 'dart:async';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:intl/intl.dart';
+
+import 'edit_medication_screen.dart';
 
 class MedicationSchedule extends StatefulWidget {
   final String userId;
@@ -11,11 +15,17 @@ class MedicationSchedule extends StatefulWidget {
   @override
   State<MedicationSchedule> createState() => _MedicationScheduleState();
 }
+
 class _MedicationScheduleState extends State<MedicationSchedule> {
   final MedicationService _service = MedicationService();
   late Future<List<Medication>> _medicationsFuture;
   final Set<String> _takenMedIds = {};
   final Set<String> _skippedMedIds = {};
+
+  DateTime _focusedDay = DateTime.now();
+  DateTime _selectedDay = DateTime.now();
+  Map<DateTime, List<Medication>> _medicationsByDate = {};
+  bool _isCalendarExpanded = false;
 
   @override
   void initState() {
@@ -29,6 +39,64 @@ class _MedicationScheduleState extends State<MedicationSchedule> {
 
     setState(() {
       _medicationsFuture = _service.getMedications(widget.userId);
+    });
+
+    _medicationsFuture.then((meds) {
+      _updateMedicationsByDate(meds);
+    });
+  }
+
+  String _convertDayName(String shortDayName) {
+    switch (shortDayName) {
+      case 'Sun': return 'Sunday';
+      case 'Mon': return 'Monday';
+      case 'Tue': return 'Tuesday';
+      case 'Wed': return 'Wednesday';
+      case 'Thu': return 'Thursday';
+      case 'Fri': return 'Friday';
+      case 'Sat': return 'Saturday';
+      default: return shortDayName;
+    }
+  }
+
+  String _convertToShortDayName(String fullDayName) {
+    switch (fullDayName) {
+      case 'Sunday': return 'Sun';
+      case 'Monday': return 'Mon';
+      case 'Tuesday': return 'Tue';
+      case 'Wednesday': return 'Wed';
+      case 'Thursday': return 'Thu';
+      case 'Friday': return 'Fri';
+      case 'Saturday': return 'Sat';
+      default: return fullDayName;
+    }
+  }
+
+  bool _shouldTakeOnDate(Medication med, DateTime date) {
+    if (!med.isActiveOnDate(date)) {
+      return false;
+    }
+
+    final currentDayShort = _convertToShortDayName(DateFormat('EEEE').format(date));
+    return med.weekDays.contains(currentDayShort);
+  }
+
+  void _updateMedicationsByDate(List<Medication> medications) {
+    final Map<DateTime, List<Medication>> medicationsMap = {};
+
+    for (final med in medications) {
+      final fullDayNames = med.weekDays.map(_convertDayName).toList();
+
+      for (int i = 0; i < 60; i++) {
+        final date = DateTime.now().add(Duration(days: i));
+        if (_shouldTakeOnDate(med, date)) {
+          medicationsMap.putIfAbsent(DateTime(date.year, date.month, date.day), () => []).add(med);
+        }
+      }
+    }
+
+    setState(() {
+      _medicationsByDate = medicationsMap;
     });
   }
 
@@ -46,6 +114,7 @@ class _MedicationScheduleState extends State<MedicationSchedule> {
       _refresh();
     }
   }
+
   void _navigateToEditScreen(Medication med) async {
     final result = await Navigator.push<bool>(
       context,
@@ -60,36 +129,33 @@ class _MedicationScheduleState extends State<MedicationSchedule> {
       _refresh();
     }
   }
-  Future<String?> _showMedicationMenu(
-      BuildContext context, RelativeRect position, Medication med) async {
-    if (med.id == null) return null;
 
-    return showMenu<String>(
-      context: context,
-      position: position,
-      items: [
-        const PopupMenuItem<String>(
-          value: 'take',
-          child: Row(
-            children: [
-              Icon(Icons.check_circle_outline, color: Colors.green),
-              SizedBox(width: 8),
-              Text('Take'),
-            ],
-          ),
-        ),
-        const PopupMenuItem<String>(
-          value: 'edit',
-          child: Row(
-            children: [
-              Icon(Icons.edit_outlined, color: Colors.blue),
-              SizedBox(width: 8),
-              Text('Edit'),
-            ],
-          ),
-        ),
-      ],
-    );
+  String _getDurationInfo(Medication med) {
+    if (med.endDate == null) return 'No end date';
+
+    final now = DateTime.now();
+    final daysLeft = med.endDate!.difference(now).inDays;
+
+    if (daysLeft < 0) return 'Expired';
+    if (daysLeft == 0) return 'Ends today';
+    if (daysLeft == 1) return '1 day left';
+    if (daysLeft < 7) return '$daysLeft days left';
+    if (daysLeft < 30) return '${(daysLeft / 7).round()} weeks left';
+
+    return '${(daysLeft / 30).round()} months left';
+  }
+
+  bool _shouldCollapseCalendar(List<Medication> meds, DateTime selectedDay) {
+    if (meds.isEmpty) return false;
+
+    int medicationsCount = 0;
+    for (final med in meds) {
+      if (_shouldTakeOnDate(med, selectedDay)) {
+        medicationsCount += med.times.length;
+      }
+    }
+
+    return medicationsCount > 3 || meds.length > 5;
   }
 
   @override
@@ -97,7 +163,11 @@ class _MedicationScheduleState extends State<MedicationSchedule> {
     return Scaffold(
       floatingActionButton: FloatingActionButton(
         onPressed: _navigateToAddScreen,
-        child: const Icon(Icons.add),
+        backgroundColor: Theme.of(context).colorScheme.primary,
+        child: Icon(
+          Icons.add,
+          color: Theme.of(context).colorScheme.onPrimary,
+        ),
       ),
       body: FutureBuilder<List<Medication>>(
         future: _medicationsFuture,
@@ -106,86 +176,231 @@ class _MedicationScheduleState extends State<MedicationSchedule> {
             return const Center(child: CircularProgressIndicator());
           }
           if (snapshot.hasError) {
-            return Center(child: Text("Error: ${snapshot.error}"));
+            return Center(
+              child: Text(
+                "Error: ${snapshot.error}",
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.error,
+                ),
+              ),
+            );
           }
           final meds = snapshot.data ?? [];
 
+          final bool shouldCollapse = _shouldCollapseCalendar(meds, _selectedDay);
+          final bool showCollapsedCalendar = shouldCollapse && !_isCalendarExpanded;
+
           final Map<String, List<Medication>> groupedMeds = {};
           for (final med in meds) {
-            for (final time in med.times) {
-              groupedMeds.putIfAbsent(time.time, () => []).add(med);
+            final shouldTakeToday = _shouldTakeOnDate(med, _selectedDay);
+
+            if (shouldTakeToday) {
+              for (final time in med.times) {
+                groupedMeds.putIfAbsent(time.time, () => []).add(med);
+              }
             }
           }
           final sortedTimes = groupedMeds.keys.toList()..sort();
 
-          if (meds.isEmpty) {
-            return const Center(
-              child: Text(
-                "No medications scheduled.\nTap '+' to add one.",
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 16, color: Colors.grey),
-              ),
-            );
-          }
-
-          final TimeOfDay now = TimeOfDay.now();
-          final double nowInMinutes = now.hour * 60.0 + now.minute;
-          String? currentActiveTimeGroup;
-
-          for (final timeStr in sortedTimes) {
-            final groupTime = TimeOfDay(
-                hour: int.parse(timeStr.split(':')[0]),
-                minute: int.parse(timeStr.split(':')[1]));
-            final groupTimeInMinutes =
-                groupTime.hour * 60.0 + groupTime.minute;
-
-            if (groupTimeInMinutes <= nowInMinutes) {
-              currentActiveTimeGroup = timeStr;
-            } else {
-              break;
-            }
-          }
-
-          return ListView(
-            padding: const EdgeInsets.all(16.0),
+          return Column(
             children: [
+              Card(
+                margin: const EdgeInsets.all(16),
+                elevation: 2,
+                color: Theme.of(context).cardColor,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    children: [
+                      if (shouldCollapse)
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            Text(
+                              _isCalendarExpanded ? 'Minimize' : 'Maximize',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Theme.of(context).colorScheme.primary,
+                              ),
+                            ),
+                            IconButton(
+                              icon: Icon(
+                                _isCalendarExpanded
+                                    ? Icons.keyboard_arrow_up
+                                    : Icons.keyboard_arrow_down,
+                                color: Theme.of(context).colorScheme.primary,
+                                size: 20,
+                              ),
+                              onPressed: () {
+                                setState(() {
+                                  _isCalendarExpanded = !_isCalendarExpanded;
+                                });
+                              },
+                            ),
+                          ],
+                        ),
+
+                      if (showCollapsedCalendar)
+                        _buildCompactCalendar()
+                      else
+                        _buildFullCalendar(),
+
+                      const SizedBox(height: 8),
+
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Container(
+                            width: 8,
+                            height: 8,
+                            decoration: const BoxDecoration(
+                              color: Colors.green,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            'Scheduled medication',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.6),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+
               Padding(
-                padding:
-                const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+                padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Row(
-                  children: const [
-                    SizedBox(
-                      width: 70,
-                      child: Text(
-                        "Time",
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                          color: Colors.black87,
-                        ),
+                  children: [
+                    Text(
+                      'Medication for ${DateFormat('dd.MM.yyyy').format(_selectedDay)}',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Theme.of(context).textTheme.bodyLarge?.color,
                       ),
                     ),
-                    SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        "Medication",
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                          color: Colors.black87,
+                    const Spacer(),
+                    if (!isSameDay(_selectedDay, DateTime.now()))
+                      TextButton(
+                        onPressed: () {
+                          setState(() {
+                            _selectedDay = DateTime.now();
+                            _focusedDay = DateTime.now();
+                          });
+                        },
+                        child: Text(
+                          'Today',
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
                         ),
                       ),
-                    ),
                   ],
                 ),
               ),
-              const SizedBox(height: 12),
-              ...sortedTimes.map((time) {
-                final medsAtTime = groupedMeds[time]!;
-                final bool isActive = (time == currentActiveTimeGroup); 
-                return _buildTimeGroup(context, time, medsAtTime,
-                    isActive: isActive);
-              }).toList(),
+
+              const SizedBox(height: 16),
+
+
+              if (meds.isEmpty)
+                const Expanded(
+                  child: Center(
+                    child: Text(
+                      "No medications scheduled.\nTap '+' to add one.",
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 16, color: Colors.grey),
+                    ),
+                  ),
+                )
+              else if (sortedTimes.isEmpty)
+                Expanded(
+                  child: Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          "No medications scheduled for ${DateFormat('dd.MM.yyyy').format(_selectedDay)}",
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.6),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          "Day of week: ${_convertToShortDayName(DateFormat('EEEE').format(_selectedDay))}",
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.6),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          "Active medications: ${meds.length}",
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.6),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              else
+                Expanded(
+                  child: ListView(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+                        child: Row(
+                          children: [
+                            SizedBox(
+                              width: 70,
+                              child: Text(
+                                "Time",
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                  color: Theme.of(context).textTheme.bodyLarge?.color,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                "Medication",
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                  color: Theme.of(context).textTheme.bodyLarge?.color,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      ...sortedTimes.map((time) {
+                        final medsAtTime = groupedMeds[time]!;
+                        final bool isActive = _isTimeActive(time);
+                        return _buildTimeGroup(context, time, medsAtTime, isActive: isActive);
+                      }).toList(),
+                    ],
+                  ),
+                ),
             ],
           );
         },
@@ -193,13 +408,212 @@ class _MedicationScheduleState extends State<MedicationSchedule> {
     );
   }
 
-  Widget _buildTimeGroup(
-      BuildContext context, String rawTime, List<Medication> meds,
-      {bool isActive = false}) { 
+  Widget _buildCompactCalendar() {
+    final weekStart = _focusedDay.subtract(Duration(days: _focusedDay.weekday - 1));
+
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: Text(
+            DateFormat('MMMM yyyy').format(_focusedDay),
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: Theme.of(context).textTheme.bodyLarge?.color,
+            ),
+          ),
+        ),
+
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: List.generate(7, (index) {
+            final day = weekStart.add(Duration(days: index));
+            final isSelected = isSameDay(_selectedDay, day);
+            final isToday = isSameDay(DateTime.now(), day);
+            final hasMedications = _medicationsByDate[DateTime(day.year, day.month, day.day)]?.isNotEmpty ?? false;
+
+            return Expanded(
+              child: GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _selectedDay = day;
+                    _focusedDay = day;
+                  });
+                },
+                child: Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 2),
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  decoration: BoxDecoration(
+                    color: isSelected ? Theme.of(context).colorScheme.primary : Colors.transparent,
+                    borderRadius: BorderRadius.circular(8),
+                    border: isToday
+                        ? Border.all(
+                      color: Theme.of(context).colorScheme.primary.withOpacity(0.5),
+                      width: 1,
+                    )
+                        : null,
+                  ),
+                  child: Column(
+                    children: [
+                      Text(
+                        DateFormat('E').format(day)[0],
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: isSelected
+                              ? Theme.of(context).colorScheme.onPrimary
+                              : Theme.of(context).textTheme.bodyMedium?.color,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        day.day.toString(),
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: isSelected
+                              ? Theme.of(context).colorScheme.onPrimary
+                              : Theme.of(context).textTheme.bodyLarge?.color,
+                        ),
+                      ),
+                      if (hasMedications)
+                        Container(
+                          margin: const EdgeInsets.only(top: 4),
+                          width: 4,
+                          height: 4,
+                          decoration: const BoxDecoration(
+                            color: Colors.green,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          }),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFullCalendar() {
+    return TableCalendar(
+      firstDay: DateTime.utc(2023, 1, 1),
+      lastDay: DateTime.utc(2030, 12, 31),
+      focusedDay: _focusedDay,
+      selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
+      onDaySelected: (selectedDay, focusedDay) {
+        setState(() {
+          _selectedDay = selectedDay;
+          _focusedDay = focusedDay;
+        });
+      },
+      onPageChanged: (focusedDay) {
+        setState(() {
+          _focusedDay = focusedDay;
+        });
+      },
+      eventLoader: (day) {
+        return _medicationsByDate[DateTime(day.year, day.month, day.day)] ?? [];
+      },
+      calendarStyle: CalendarStyle(
+        todayDecoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.primary.withOpacity(0.3),
+          shape: BoxShape.circle,
+        ),
+        selectedDecoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.primary,
+          shape: BoxShape.circle,
+        ),
+        markerDecoration: BoxDecoration(
+          color: Colors.green,
+          shape: BoxShape.circle,
+        ),
+        markerSize: 6,
+        markerMargin: const EdgeInsets.symmetric(horizontal: 1),
+        defaultTextStyle: TextStyle(
+          color: Theme.of(context).textTheme.bodyLarge?.color,
+        ),
+        weekendTextStyle: TextStyle(
+          color: Theme.of(context).textTheme.bodyLarge?.color,
+        ),
+        outsideTextStyle: TextStyle(
+          color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.5),
+        ),
+      ),
+      headerStyle: HeaderStyle(
+        formatButtonVisible: false,
+        titleCentered: true,
+        titleTextStyle: TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.w600,
+          color: Theme.of(context).textTheme.bodyLarge?.color,
+        ),
+        leftChevronIcon: Icon(
+          Icons.chevron_left,
+          color: Theme.of(context).iconTheme.color,
+        ),
+        rightChevronIcon: Icon(
+          Icons.chevron_right,
+          color: Theme.of(context).iconTheme.color,
+        ),
+        headerPadding: const EdgeInsets.symmetric(vertical: 8),
+      ),
+      daysOfWeekStyle: DaysOfWeekStyle(
+        weekdayStyle: TextStyle(
+          fontSize: 12,
+          color: Theme.of(context).textTheme.bodyMedium?.color,
+        ),
+        weekendStyle: TextStyle(
+          fontSize: 12,
+          color: Theme.of(context).textTheme.bodyMedium?.color,
+        ),
+      ),
+      calendarBuilders: CalendarBuilders(
+        markerBuilder: (context, date, events) {
+          if (events.isNotEmpty) {
+            return Positioned(
+              bottom: 1,
+              child: Container(
+                width: 6,
+                height: 6,
+                decoration: const BoxDecoration(
+                  color: Colors.green,
+                  shape: BoxShape.circle,
+                ),
+              ),
+            );
+          }
+          return const SizedBox.shrink();
+        },
+      ),
+    );
+  }
+
+  bool _isTimeActive(String time) {
+    if (!isSameDay(_selectedDay, DateTime.now())) {
+      return false;
+    }
+
+    final now = TimeOfDay.now();
+    final groupTime = TimeOfDay(
+      hour: int.parse(time.split(':')[0]),
+      minute: int.parse(time.split(':')[1]),
+    );
+
+    final nowInMinutes = now.hour * 60 + now.minute;
+    final groupTimeInMinutes = groupTime.hour * 60 + groupTime.minute;
+
+    return groupTimeInMinutes <= nowInMinutes;
+  }
+
+  Widget _buildTimeGroup(BuildContext context, String rawTime, List<Medication> meds, {bool isActive = false}) {
     final displayTime = _formatDisplayTime(context, rawTime);
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 0), 
+      padding: const EdgeInsets.only(bottom: 0),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -207,15 +621,14 @@ class _MedicationScheduleState extends State<MedicationSchedule> {
             width: 70,
             child: Text(
               displayTime,
-              style: const TextStyle(
+              style: TextStyle(
                 fontWeight: FontWeight.w600,
                 fontSize: 16,
-                color: Colors.black87,
+                color: Theme.of(context).textTheme.bodyLarge?.color,
               ),
             ),
           ),
           const SizedBox(width: 24),
-
           Expanded(
             child: Stack(
               clipBehavior: Clip.none,
@@ -228,8 +641,8 @@ class _MedicationScheduleState extends State<MedicationSchedule> {
                     width: 3,
                     decoration: BoxDecoration(
                       color: isActive
-                          ? Colors.blue.shade300
-                          : Colors.grey.shade300,
+                          ? Theme.of(context).colorScheme.primary
+                          : Theme.of(context).dividerColor,
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -242,8 +655,8 @@ class _MedicationScheduleState extends State<MedicationSchedule> {
                       if (i < meds.length - 1)
                         Divider(
                           color: (isActive
-                              ? Colors.blue.shade300
-                              : Colors.grey.shade300)
+                              ? Theme.of(context).colorScheme.primary
+                              : Theme.of(context).dividerColor)
                               .withOpacity(0.5),
                           height: 16,
                           thickness: 1,
@@ -261,24 +674,34 @@ class _MedicationScheduleState extends State<MedicationSchedule> {
       ),
     );
   }
+
   Widget _buildMedicationCard(Medication med, {bool isActive = false}) {
     final bool isTaken = med.id != null && _takenMedIds.contains(med.id);
     final bool isSkipped = med.id != null && _skippedMedIds.contains(med.id);
     final bool isDone = isTaken || isSkipped;
+    final bool isExpired = med.endDate != null && DateTime.now().isAfter(med.endDate!);
 
-    final Color bgColor = isTaken
+    final Color bgColor = isExpired
+        ? Colors.red.shade100.withOpacity(0.3)
+        : isTaken
         ? Colors.green.shade100.withOpacity(0.4)
         : isSkipped
         ? Colors.red.shade100.withOpacity(0.4)
         : isActive
-        ? Colors.blue.withOpacity(0.18)
-        : Colors.grey.shade200;
+        ? Theme.of(context).colorScheme.primary.withOpacity(0.18)
+        : Theme.of(context).cardColor.withOpacity(0.7);
 
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: bgColor,
         borderRadius: BorderRadius.circular(16),
+        border: isExpired
+            ? Border.all(color: Colors.red.shade300, width: 1)
+            : Border.all(
+          color: Theme.of(context).dividerColor.withOpacity(0.3),
+          width: 1,
+        ),
       ),
       child: Row(
         children: [
@@ -292,6 +715,9 @@ class _MedicationScheduleState extends State<MedicationSchedule> {
                     fontSize: 17,
                     fontWeight: FontWeight.w600,
                     decoration: isDone ? TextDecoration.lineThrough : null,
+                    color: isExpired
+                        ? Colors.red.shade700
+                        : Theme.of(context).textTheme.bodyLarge?.color,
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -299,8 +725,42 @@ class _MedicationScheduleState extends State<MedicationSchedule> {
                   _getDoseSubtitle(med),
                   style: TextStyle(
                     fontSize: 14,
-                    color: Colors.black54,
+                    color: isExpired
+                        ? Colors.red.shade600
+                        : Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.7),
                     decoration: isDone ? TextDecoration.lineThrough : null,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Duration: ${med.duration} • ${_getDurationInfo(med)}',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: isExpired
+                        ? Colors.red.shade600
+                        : Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.6),
+                  ),
+                ),
+                if (med.endDate != null) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    'Ends: ${DateFormat('dd.MM.yyyy').format(med.endDate!)}',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: isExpired
+                          ? Colors.red.shade600
+                          : Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.6),
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 2),
+                Text(
+                  'Days: ${med.weekDays.join(", ")}',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: isExpired
+                        ? Colors.red.shade600
+                        : Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.6),
                   ),
                 ),
               ],
@@ -313,28 +773,75 @@ class _MedicationScheduleState extends State<MedicationSchedule> {
                   _takenMedIds.add(med.id!);
                   _skippedMedIds.remove(med.id!);
                 });
+              } else if (value == 'skip' && med.id != null) {
+                setState(() {
+                  _skippedMedIds.add(med.id!);
+                  _takenMedIds.remove(med.id!);
+                });
               } else if (value == 'edit') {
                 _navigateToEditScreen(med);
+              } else if (value == 'delete' && med.id != null) {
+                _showDeleteDialog(med);
               }
             },
             itemBuilder: (context) => [
-              const PopupMenuItem<String>(
-                value: 'take',
-                child: Row(
-                  children: [
-                    Icon(Icons.check_circle_outline, color: Colors.green),
-                    SizedBox(width: 8),
-                    Text('Take'),
-                  ],
+              if (!isExpired) ...[
+                PopupMenuItem<String>(
+                  value: 'take',
+                  child: Row(
+                    children: [
+                      Icon(Icons.check_circle_outline, color: Colors.green),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Taken',
+                        style: TextStyle(
+                          color: Theme.of(context).textTheme.bodyLarge?.color,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              const PopupMenuItem<String>(
+                PopupMenuItem<String>(
+                  value: 'skip',
+                  child: Row(
+                    children: [
+                      Icon(Icons.cancel_outlined, color: Colors.orange),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Skip',
+                        style: TextStyle(
+                          color: Theme.of(context).textTheme.bodyLarge?.color,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+              PopupMenuItem<String>(
                 value: 'edit',
                 child: Row(
                   children: [
-                    Icon(Icons.edit_outlined, color: Colors.blue),
-                    SizedBox(width: 8),
-                    Text('Edit'),
+                    Icon(Icons.edit_outlined, color: Theme.of(context).colorScheme.primary),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Edit',
+                      style: TextStyle(
+                        color: Theme.of(context).textTheme.bodyLarge?.color,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              PopupMenuItem<String>(
+                value: 'delete',
+                child: Row(
+                  children: [
+                    Icon(Icons.delete_outline, color: Colors.red),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Delete',
+                      style: const TextStyle(color: Colors.red),
+                    ),
                   ],
                 ),
               ),
@@ -344,48 +851,122 @@ class _MedicationScheduleState extends State<MedicationSchedule> {
               height: 40,
               padding: const EdgeInsets.all(6),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.7),
+                color: Theme.of(context).cardColor,
                 shape: BoxShape.circle,
+                border: Border.all(
+                  color: Theme.of(context).dividerColor.withOpacity(0.3),
+                ),
               ),
-              child: med.type == MedicationType.tablet
-                  ? SvgPicture.asset(
-                'assets/icons/pill.svg',
-                color: Colors.green,
-              )
-                  : Icon(
-                med.type == MedicationType.capsule
-                    ? LucideIcons.pill
-                    : LucideIcons.droplet,
-                color: med.type == MedicationType.capsule
-                    ? Colors.blue
-                    : Colors.orange,
-                size: 26,
-              ),
+              child: _getMedicationIcon(med, isExpired),
             ),
           )
         ],
       ),
     );
   }
-  (IconData, Color) _getMedicationTypeVisuals(MedicationType type) {
-    switch (type) {
-      case MedicationType.capsule:
-        return (LucideIcons.pill, const Color(0xFF6C77FF));
-      case MedicationType.tablet:
-        return (LucideIcons.circle, const Color(0xFF8BC34A));
-      case MedicationType.drops:
-        return (LucideIcons.droplet, const Color(0xFFFF8A65));
-      default:
-        return (Icons.more_horiz, const Color(0xFFBA68C8));
+
+  Widget _getMedicationIcon(Medication med, bool isExpired) {
+    if (isExpired) {
+      return Icon(
+        Icons.warning_amber_rounded,
+        color: Colors.red,
+        size: 24,
+      );
     }
+
+    switch (med.type) {
+      case MedicationType.tablet:
+        return SvgPicture.asset(
+          'assets/icons/pill.svg',
+          color: Colors.green,
+        );
+      case MedicationType.capsule:
+        return Icon(
+          LucideIcons.pill,
+          color: Colors.blue,
+          size: 26,
+        );
+      case MedicationType.drops:
+        return Icon(
+          LucideIcons.droplet,
+          color: Colors.orange,
+          size: 26,
+        );
+      default:
+        return Icon(
+          LucideIcons.pill,
+          color: Theme.of(context).textTheme.bodyMedium?.color,
+          size: 26,
+        );
+    }
+  }
+
+  void _showDeleteDialog(Medication med) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: Theme.of(context).cardColor,
+          title: Text(
+            'Delete Medication',
+            style: TextStyle(
+              color: Theme.of(context).textTheme.bodyLarge?.color,
+            ),
+          ),
+          content: Text(
+            'Are you sure you want to delete "${med.nameOfMedication}"?',
+            style: TextStyle(
+              color: Theme.of(context).textTheme.bodyMedium?.color,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(
+                'Cancel',
+                style: TextStyle(
+                  color: Theme.of(context).textTheme.bodyMedium?.color,
+                ),
+              ),
+            ),
+            TextButton(
+              onPressed: () async {
+                Navigator.of(context).pop();
+                try {
+                  await _service.deleteMedication(med.id!);
+                  _refresh();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('"${med.nameOfMedication}" deleted successfully'),
+                      backgroundColor: Theme.of(context).colorScheme.primary,
+                    ),
+                  );
+                } catch (e) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Error deleting medication: $e'),
+                      backgroundColor: Theme.of(context).colorScheme.error,
+                    ),
+                  );
+                }
+              },
+              child: const Text(
+                'Delete',
+                style: TextStyle(color: Colors.red),
+              ),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   String _getDoseSubtitle(Medication med) {
     switch (med.type) {
       case MedicationType.capsule:
-        return "1 capsule";
+        return "1 capsule • ${med.dose}";
       case MedicationType.tablet:
-        return "1 tablet";
+        return "1 tablet • ${med.dose}";
       case MedicationType.drops:
         return "${med.dose.split(' ')[0]} drops";
       default:
@@ -402,415 +983,5 @@ class _MedicationScheduleState extends State<MedicationSchedule> {
     } catch (e) {
       return time;
     }
-  }
-}
-
-
-class AddMedicationScreen extends StatefulWidget {
-  final String userId;
-  final Medication? medicationToEdit;
-  const AddMedicationScreen({super.key, required this.userId, this.medicationToEdit,});
-
-  @override
-  State<AddMedicationScreen> createState() => _AddMedicationScreenState();
-}
-
-class _AddMedicationScreenState extends State<AddMedicationScreen> {
-  final _formKey = GlobalKey<FormState>();
-  final _service = MedicationService();
-
-  final _nameController = TextEditingController();
-  final _doseController = TextEditingController();
-
-  MedicationType _selectedType = MedicationType.capsule;
-  final List<TimeOfDay> _times = [];
-
-  String _duration = "6 months";
-
-  final List<String> _dayNames = const [
-    "Sun",
-    "Mon",
-    "Tue",
-    "Wed",
-    "Thu",
-    "Fri",
-    "Sat"
-  ];
-  List<bool> _selectedDays = List.generate(7, (index) => true);
-  bool get isEditing => widget.medicationToEdit != null;
-
-  @override
-  void initState() {
-    super.initState();
-    if (isEditing) {
-      final med = widget.medicationToEdit!;
-      _nameController.text = med.nameOfMedication;
-      _doseController.text = med.dose;
-      _selectedType = med.type;
-      _duration = med.duration;
-      _times.addAll(med.times.map((t) => TimeOfDay(
-        hour: int.parse(t.time.split(':')[0]),
-        minute: int.parse(t.time.split(':')[1]),
-      )));
-      List<bool> days = List.generate(7, (index) => false);
-      for (String dayName in med.weekDays) {
-        int index = _dayNames.indexOf(dayName);
-        if (index != -1) {
-          days[index] = true;
-        }
-      }
-      _selectedDays = days;
-    }
-  }
-
-
-  @override
-  void dispose() {
-    _nameController.dispose();
-    _doseController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _pickTime() async {
-    final time = await showTimePicker(
-      context: context,
-      initialTime: TimeOfDay.now(),
-    );
-    if (time != null && !_times.contains(time)) {
-      setState(() {
-        _times.add(time);
-        _times.sort((a, b) => a.hour.compareTo(b.hour) == 0
-            ? a.minute.compareTo(b.minute)
-            : a.hour.compareTo(b.hour));
-      });
-    }
-  }
-
-  Future<void> _editDuration() async {
-    final controller = TextEditingController(text: _duration);
-    final result = await showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text("Edit duration"),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          decoration: const InputDecoration(
-            hintText: "e.g., 7 days, 2 weeks, 3 months",
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("Cancel"),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, controller.text),
-            child: const Text("Save"),
-          ),
-        ],
-      ),
-    );
-
-    if (result != null && result.isNotEmpty) {
-      setState(() {
-        _duration = result;
-      });
-    }
-  }
-  Future<void> _saveMedication() async {
-    if (!_formKey.currentState!.validate()) return;
-    if (_times.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please add at least one time slot")),
-      );
-      return;
-    }
-
-    final List<String> selectedDayNames = _selectedDays.asMap().entries
-        .where((e) => e.value)
-        .map((e) => _dayNames[e.key])
-        .toList();
-
-    final med = Medication(
-      id: isEditing ? widget.medicationToEdit!.id : null,
-      userId: widget.userId,
-      nameOfMedication: _nameController.text,
-      dose: _doseController.text,
-      weekDays: selectedDayNames,
-      duration: _duration,
-      type: _selectedType,
-      times: _times
-          .map((t) => MedicationTime(
-          time:
-          "${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}"))
-          .toList(),
-    );
-
-    try {
-      if (isEditing) {
-        await _service.updateMedication(med);
-      } else {
-        await _service.addMedication(med);
-      }
-
-      if (mounted) {
-        Navigator.pop(context, true);
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Failed to save medication: $e")),
-        );
-      }
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(isEditing ? "Edit medication" : "New medication"),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pop(context),
-        ),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        scrolledUnderElevation: 0,
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildSectionTitle("Type"),
-              _buildTypeSelector(),
-              const SizedBox(height: 24),
-              _buildSectionTitle("General information"),
-              TextFormField(
-                controller: _nameController,
-                decoration: InputDecoration(
-                  hintText: 'Name',
-                  filled: true,
-                  fillColor: Colors.grey.shade100,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12.0),
-                    borderSide: BorderSide.none,
-                  ),
-                ),
-                validator: (v) => v!.isEmpty ? "Please enter a name" : null,
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _doseController,
-                decoration: InputDecoration(
-                  hintText: 'Dose (e.g., 30mg, 20ml)',
-                  filled: true,
-                  fillColor: Colors.grey.shade100,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12.0),
-                    borderSide: BorderSide.none,
-                  ),
-                ),
-                validator: (v) => v!.isEmpty ? "Please enter a dose" : null,
-              ),
-              const SizedBox(height: 24),
-              _buildSectionTitle("Timeline & schedule"),
-              _buildTimeSelector(),
-              const SizedBox(height: 12),
-              _buildScheduleTile("Duration", _duration, _editDuration),
-              const SizedBox(height: 12),
-              _buildFrequencySelector(),
-              const SizedBox(height: 24),
-            ],
-          ),
-        ),
-      ),
-      bottomNavigationBar: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: ElevatedButton(
-          onPressed: _saveMedication,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.blue,
-            foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            textStyle:
-            const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12.0),
-            ),
-          ),
-          child: Text(isEditing ? "Save changes" : "Next"),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSectionTitle(String title) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12.0, top: 8.0),
-      child: Text(
-        title,
-        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
-      ),
-    );
-  }
-
-  Widget _buildTypeSelector() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        _buildTypeChip(MedicationType.capsule, "Capsule", LucideIcons.pill),
-        _buildTypeChip(MedicationType.tablet, "Tablet", LucideIcons.circle), //TODO:change icon for svg
-        _buildTypeChip(MedicationType.drops, "Drops", LucideIcons.droplet),
-        _buildTypeChip(MedicationType.other, "Other", Icons.more_horiz),
-      ],
-    );
-  }
-
-  Widget _buildTypeChip(MedicationType type, String label, IconData icon) {
-    final isSelected = _selectedType == type;
-    final color = Theme.of(context).primaryColor;
-
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          _selectedType = type;
-        });
-      },
-      child: Container(
-        width: 80,
-        height: 80,
-        decoration: BoxDecoration(
-          color: isSelected ? color.withOpacity(0.1) : Colors.grey.shade100,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: isSelected ? color : Colors.transparent,
-            width: 2,
-          ),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon,
-                color: isSelected ? color : Colors.grey.shade700, size: 28),
-            const SizedBox(height: 6),
-            Text(label,
-                style: const TextStyle(
-                    fontSize: 13, fontWeight: FontWeight.w500)),
-          ],
-        ),
-      ),
-    );
-  }
-
-
-  Widget _buildTimeSelector() {
-    return Wrap(
-      spacing: 8.0,
-      runSpacing: 4.0,
-      crossAxisAlignment: WrapCrossAlignment.center,
-      children: [
-        ..._times.map((time) => Chip(
-          label: Text(time.format(context),
-              style: const TextStyle(fontWeight: FontWeight.w500)),
-          onDeleted: () => setState(() => _times.remove(time)),
-          backgroundColor: Colors.grey.shade100,
-          shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-              side: BorderSide(color: Colors.grey.shade200)),
-        )),
-        GestureDetector(
-          onTap: _pickTime,
-          child: Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: Colors.grey.shade100,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Icon(Icons.add, color: Colors.black54),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildScheduleTile(String title, String value, VoidCallback onTap) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12.0),
-      decoration: BoxDecoration(
-        color: Colors.grey.shade100,
-        borderRadius: BorderRadius.circular(12.0),
-      ),
-      child: ListTile(
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w500)),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(value,
-                style: const TextStyle(color: Colors.black54, fontSize: 16)),
-            const SizedBox(width: 4),
-            const Icon(Icons.chevron_right, color: Colors.black54),
-          ],
-        ),
-        onTap: onTap,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12.0),
-        ),
-      ),
-    );
-  }
-  Widget _buildFrequencySelector() {
-    return Container(
-      padding: const EdgeInsets.all(16.0),
-      decoration: BoxDecoration(
-        color: Colors.grey.shade100,
-        borderRadius: BorderRadius.circular(12.0),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            "Frequency",
-            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: List.generate(7, (index) {
-              return Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    _dayNames[index],
-                    style: TextStyle(
-                      color: _selectedDays[index]
-                          ? Colors.blue
-                          : Colors.grey.shade700,
-                      fontWeight: _selectedDays[index]
-                          ? FontWeight.bold
-                          : FontWeight.normal,
-                    ),
-                  ),
-                  Checkbox(
-                    value: _selectedDays[index],
-                    onChanged: (bool? value) {
-                      setState(() {
-                        _selectedDays[index] = value ?? false;
-                      });
-                    },
-                    activeColor: Colors.blue,
-                  ),
-                ],
-              );
-            }),
-          ),
-        ],
-      ),
-    );
   }
 }

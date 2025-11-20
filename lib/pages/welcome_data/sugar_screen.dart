@@ -20,16 +20,24 @@ class OnboardingPageSugar extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.center,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Text(
+        Text(
           "What is your sugar level?",
           textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+          style: TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+            color: Theme.of(context).textTheme.bodyLarge?.color,
+          ),
         ),
         const SizedBox(height: 16),
         Text(
           "${initialSugar.toStringAsFixed(1)} mmol/L",
           textAlign: TextAlign.center,
-          style: const TextStyle(fontSize: 48, fontWeight: FontWeight.bold, color: Colors.blue),
+          style: TextStyle(
+            fontSize: 48,
+            fontWeight: FontWeight.bold,
+            color: Theme.of(context).colorScheme.primary,
+          ),
         ),
         SizedBox(
           height: 250,
@@ -44,7 +52,10 @@ class OnboardingPageSugar extends StatelessWidget {
               return Center(
                 child: Text(
                   value.toStringAsFixed(1),
-                  style: const TextStyle(fontSize: 28),
+                  style: TextStyle(
+                    fontSize: 28,
+                    color: Theme.of(context).textTheme.bodyLarge?.color,
+                  ),
                 ),
               );
             }),

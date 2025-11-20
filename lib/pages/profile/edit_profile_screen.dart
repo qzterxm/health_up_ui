@@ -1,4 +1,7 @@
+import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:health_up/services/auth_service.dart';
 
 class EditProfileScreen extends StatefulWidget {
@@ -33,26 +36,18 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   String? _selectedGender;
   bool _isSaving = false;
 
-  String formatDateForApi(String input) {
-    // Converts DD/MM/YYYY -> YYYY-MM-DD
-    final parts = input.split('/');
-    if (parts.length != 3) return input;
-    final day = parts[0].padLeft(2, '0');
-    final month = parts[1].padLeft(2, '0');
-    final year = parts[2];
-    return "$year-$month-$day";
-  }
+  File? _selectedImageFile;
+  final ImagePicker _picker = ImagePicker();
   final List<String> _genders = ['Male', 'Female'];
 
   @override
   void initState() {
     super.initState();
 
-    // Initialize controllers with user data
     _fullNameController = TextEditingController(text: widget.userName);
     _emailController = TextEditingController(text: widget.userEmail);
     _dobController = TextEditingController(
-        text: widget.userData?['dateOfBirth'] ?? "20/05/2005"
+        text: widget.userData?['dateOfBirth'] ?? "01/01/2000"
     );
     _phoneController = TextEditingController(
         text: widget.userData?['phoneNumber'] ?? ""
@@ -79,6 +74,56 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     super.dispose();
   }
 
+
+  String formatDateForApi(String input) {
+    final parts = input.split('/');
+    if (parts.length != 3) return input;
+    final day = parts[0].padLeft(2, '0');
+    final month = parts[1].padLeft(2, '0');
+    final year = parts[2];
+    return "$year-$month-$day";
+  }
+
+  Future<void> _pickImage() async {
+    try {
+      final XFile? pickedFile = await _picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 800,
+        maxHeight: 800,
+        imageQuality: 80,
+      );
+
+      if (pickedFile != null) {
+        setState(() {
+          _selectedImageFile = File(pickedFile.path);
+        });
+      }
+    } catch (e) {
+      _showSnackBar("Error picking image: $e");
+    }
+  }
+
+  ImageProvider? _getAvatarImage() {
+    if (_selectedImageFile != null) {
+      return FileImage(_selectedImageFile!);
+    }
+
+    final String? existingUrl = widget.userData?["profilePictureUrl"];
+    if (existingUrl != null && existingUrl.isNotEmpty) {
+      if (existingUrl.startsWith('http')) {
+        return NetworkImage(existingUrl);
+      } else {
+        try {
+          return MemoryImage(base64Decode(existingUrl));
+        } catch (e) {
+          return null;
+        }
+      }
+    }
+
+    return null;
+  }
+
   Future<void> _saveChanges() async {
     if (_fullNameController.text.isEmpty || _emailController.text.isEmpty) {
       _showSnackBar("Please fill in all required fields");
@@ -90,78 +135,81 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     try {
       final auth = AuthService();
 
-      // Форматування даних перед відправкою
-      final formattedPhone = _phoneController.text.startsWith('+')
-          ? _phoneController.text
-          : '${_phoneController.text}';
+      final formattedPhone = _phoneController.text;
       final formattedCountry = _countryController.text.trim().isNotEmpty
           ? '${_countryController.text[0].toUpperCase()}${_countryController.text.substring(1)}'
           : 'Unknown';
       final formattedDob = formatDateForApi(_dobController.text);
       final gender = _selectedGender ?? 'Male';
 
+      String profilePictureValue = widget.userData?["profilePictureUrl"] ?? "";
+
+      if (_selectedImageFile != null) {
+        final bytes = await _selectedImageFile!.readAsBytes();
+        profilePictureValue = base64Encode(bytes);
+      }
+
       final payload = {
         "id": widget.userId,
         "email": _emailController.text,
         "userName": _fullNameController.text,
-        "password": _passwordController.text.isNotEmpty
-            ? _passwordController.text
-            : widget.userData?["password"] ?? "",
+        "password": _passwordController.text.isNotEmpty ? _passwordController.text : "",
         "gender": gender,
         "age": int.tryParse(_ageController.text) ?? widget.userData?["age"] ?? 0,
         "dateOfBirth": formattedDob,
         "country": formattedCountry,
         "phoneNumber": formattedPhone,
         "userRole": widget.userData?["userRole"] ?? "User",
-        "profilePictureUrl": widget.userData?["profilePictureUrl"] ?? "",
+        "profilePictureUrl": profilePictureValue,
       };
-
-      // 🔹 Логи для перевірки перед відправкою
-      print("=== UPDATE USER PAYLOAD ===");
-      payload.forEach((key, value) => print("$key: $value"));
-      print("============================");
 
       final result = await auth.updateUser(payload);
 
       setState(() => _isSaving = false);
 
-      // 🔹 Логи після отримання відповіді
-      print("=== UPDATE USER RESULT ===");
-      print(result);
-      print("===========================");
-
       if (result) {
         _showSnackBar("Profile updated successfully!");
         widget.onProfileUpdated?.call();
 
-        Future.delayed(const Duration(milliseconds: 800), () {
-          if (mounted) Navigator.of(context).pop();
-        });
+        if (mounted) {
+          Future.delayed(const Duration(milliseconds: 500), () {
+            Navigator.of(context).pop();
+          });
+        }
       } else {
-        _showSnackBar("Failed to update profile. Check backend logs.");
+        _showSnackBar("Failed to update profile.");
       }
     } catch (e) {
       setState(() => _isSaving = false);
-      print("=== UPDATE USER ERROR ===");
-      print(e);
-      print("==========================");
-      _showSnackBar("An error occurred: $e");
+      _showSnackBar("Error: $e");
     }
   }
 
-
-
   void _showSnackBar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        duration: const Duration(seconds: 3),
-      ),
+      SnackBar(content: Text(message), duration: const Duration(seconds: 3)),
     );
+  }
+
+  Future<void> _selectDate(BuildContext context) async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime(1900),
+      lastDate: DateTime.now(),
+    );
+
+    if (picked != null) {
+      setState(() {
+        _dobController.text = "${picked.day}/${picked.month}/${picked.year}";
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final avatarImage = _getAvatarImage();
+
     return Container(
       decoration: BoxDecoration(
         color: Theme.of(context).scaffoldBackgroundColor,
@@ -194,23 +242,19 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
             Stack(
               children: [
-                const CircleAvatar(
+                CircleAvatar(
                   radius: 50.0,
-                  backgroundColor: Colors.grey,
-                  child: Icon(
-                    Icons.person,
-                    color: Colors.white,
-                    size: 50,
-                  ),
+                  backgroundColor: Colors.grey.shade300,
+                  backgroundImage: avatarImage,
+                  child: avatarImage == null
+                      ? const Icon(Icons.person, color: Colors.white, size: 50)
+                      : null,
                 ),
                 Positioned(
                   bottom: 0,
                   right: 0,
                   child: GestureDetector(
-                    onTap: () {
-                      // TODO: Add photo logic
-                      print("Edit photo tapped!");
-                    },
+                    onTap: _pickImage,
                     child: Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
@@ -226,60 +270,28 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             ),
             const SizedBox(height: 32.0),
 
-            _buildInputField(
-              "Full Name *",
-              Icons.person_outline,
-              _fullNameController,
-              isEditable: true,
-            ),
+            _buildInputField("Full Name", Icons.person_outline, _fullNameController, isEditable: true),
             const SizedBox(height: 16.0),
-
-            _buildInputField(
-              "Email Address *",
-              Icons.mail_outline,
-              _emailController,
-              isEditable: true,
-              keyboardType: TextInputType.emailAddress,
-            ),
+            _buildInputField("Email Address", Icons.mail_outline, _emailController, isEditable: true, keyboardType: TextInputType.emailAddress),
             const SizedBox(height: 16.0),
-
-            _buildInputField(
-              "Phone Number",
-              Icons.phone_outlined,
-              _phoneController,
-              isEditable: true,
-              keyboardType: TextInputType.phone,
-            ),
+            _buildInputField("Phone Number", Icons.phone_outlined, _phoneController, isEditable: true, keyboardType: TextInputType.phone),
             const SizedBox(height: 16.0),
-
-            _buildInputField(
-              "Country",
-              Icons.location_on_outlined,
-              _countryController,
-              isEditable: true,
-            ),
+            _buildInputField("Country", Icons.location_on_outlined, _countryController, isEditable: true),
             const SizedBox(height: 16.0),
-
-            _buildInputField(
-              "Age",
-              Icons.cake_outlined,
-              _ageController,
-              isEditable: true,
-              keyboardType: TextInputType.number,
-            ),
+            _buildInputField("Age", Icons.cake_outlined, _ageController, isEditable: true, keyboardType: TextInputType.number),
             const SizedBox(height: 16.0),
-
             _buildGenderDropdown(),
             const SizedBox(height: 16.0),
-
             _buildInputField(
-              "Date of Birth",
-              Icons.calendar_today_outlined,
-              _dobController,
-              isEditable: true,
-              readOnly: true,
-              onTap: () => _selectDate(context),
+                "Date of Birth",
+                Icons.calendar_today_outlined,
+                _dobController,
+                isEditable: true,
+                readOnly: true,
+                onTap: () => _selectDate(context)
             ),
+            const SizedBox(height: 16.0),
+
 
             const SizedBox(height: 32.0),
 
@@ -295,14 +307,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   ),
                 ),
                 icon: _isSaving
-                    ? const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                  ),
-                )
+                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                     : const Icon(Icons.check, color: Colors.white),
                 label: Text(
                   _isSaving ? 'Saving...' : 'Save Changes',
@@ -324,6 +329,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         bool isEditable = false,
         TextInputType keyboardType = TextInputType.text,
         bool readOnly = false,
+        bool obscureText = false,
         VoidCallback? onTap,
       }) {
     return Column(
@@ -331,22 +337,19 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       children: [
         Text(
           label,
-          style: TextStyle(
-            color: Colors.grey[700],
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-          ),
+          style: TextStyle(color: Colors.grey[700], fontSize: 14, fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 8.0),
         TextField(
           controller: controller,
           keyboardType: keyboardType,
           readOnly: readOnly,
+          obscureText: obscureText,
           onTap: onTap,
           style: TextStyle(color: Colors.grey[900], fontSize: 16),
           decoration: InputDecoration(
             prefixIcon: Icon(icon, color: Colors.grey[600]),
-            suffixIcon: isEditable && !readOnly
+            suffixIcon: isEditable && !readOnly && !obscureText
                 ? Icon(Icons.edit_outlined, color: Colors.grey[400])
                 : null,
             filled: true,
@@ -355,10 +358,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               borderRadius: BorderRadius.circular(12.0),
               borderSide: BorderSide.none,
             ),
-            contentPadding: const EdgeInsets.symmetric(
-              vertical: 14.0,
-              horizontal: 16.0,
-            ),
+            contentPadding: const EdgeInsets.symmetric(vertical: 14.0, horizontal: 16.0),
           ),
         ),
       ],
@@ -371,11 +371,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       children: [
         Text(
           "Gender",
-          style: TextStyle(
-            color: Colors.grey[700],
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-          ),
+          style: TextStyle(color: Colors.grey[700], fontSize: 14, fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 8.0),
         Container(
@@ -402,41 +398,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 borderRadius: BorderRadius.circular(12.0),
                 borderSide: BorderSide.none,
               ),
-              contentPadding: const EdgeInsets.symmetric(
-                vertical: 14.0,
-                horizontal: 16.0,
-              ),
+              contentPadding: const EdgeInsets.symmetric(vertical: 14.0, horizontal: 16.0),
             ),
           ),
         ),
       ],
     );
   }
-
-  Future<void> _selectDate(BuildContext context) async {
-    final DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: DateTime.now(),
-      firstDate: DateTime(1900),
-      lastDate: DateTime.now(),
-      builder: (context, child) {
-        return Theme(
-          data: ThemeData.light().copyWith(
-            primaryColor: Colors.blue,
-            buttonTheme: const ButtonThemeData(textTheme: ButtonTextTheme.primary),
-            colorScheme: const ColorScheme.light(primary: Colors.blue),
-          ),
-          child: child!,
-        );
-      },
-    );
-
-    if (picked != null) {
-      setState(() {
-        // Save in DD/MM/YYYY format for display
-        _dobController.text = "${picked.day}/${picked.month}/${picked.year}";
-      });
-    }
-  }
-
 }

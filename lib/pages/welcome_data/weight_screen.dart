@@ -20,16 +20,24 @@ class OnboardingPageWeight extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.center,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Text(
+        Text(
           "What is your weight?",
           textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+          style: TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+            color: Theme.of(context).textTheme.bodyLarge?.color,
+          ),
         ),
         const SizedBox(height: 16),
         Text(
           "$initialWeight kg",
           textAlign: TextAlign.center,
-          style: const TextStyle(fontSize: 48, fontWeight: FontWeight.bold, color: Colors.blue),
+          style: TextStyle(
+            fontSize: 48,
+            fontWeight: FontWeight.bold,
+            color: Theme.of(context).colorScheme.primary,
+          ),
         ),
         SizedBox(
           height: 250,
@@ -43,7 +51,10 @@ class OnboardingPageWeight extends StatelessWidget {
               return Center(
                 child: Text(
                   "${index + 30}",
-                  style: const TextStyle(fontSize: 28),
+                  style: TextStyle(
+                    fontSize: 28,
+                    color: Theme.of(context).textTheme.bodyLarge?.color,
+                  ),
                 ),
               );
             }),

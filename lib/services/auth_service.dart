@@ -64,7 +64,7 @@ class AuthService {
     );
 
     if (response.statusCode == 200) return jsonDecode(response.body);
-    return {"success": false, "message": "Invalid credentials"};
+    return {"success": false, "message": "Invalid credentials or user doesn't exist"};
   }
 
   static const String userBaseUrl = "https://localhost:7223/api/user";

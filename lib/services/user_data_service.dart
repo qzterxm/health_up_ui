@@ -11,6 +11,7 @@ class AverageUserData {
   final int latestWeight;
   final double imt;
   final double latestSugar;
+  final int? age;
 
   AverageUserData({
     required this.averageHeartRate,
@@ -22,6 +23,7 @@ class AverageUserData {
     required this.latestWeight,
     required this.imt,
     required this.latestSugar,
+    this.age,
   });
 
   factory AverageUserData.fromJson(Map<String, dynamic> json) {
@@ -48,6 +50,7 @@ class AverageUserData {
       latestWeight: (data['latestWeight'] as num?)?.toInt() ?? 0,
       imt: (data['imt'] as num?)?.toDouble() ?? 0.0,
       latestSugar: (data['latestSugar'] as num?)?.toDouble() ?? 0.0,
+      age: (data['age'] as num?)?.toInt(),
     );
   }
 
@@ -62,12 +65,52 @@ class AverageUserData {
       latestWeight: 0,
       imt: 0.0,
       latestSugar: 0.0,
+      age: null,
     );
   }
 }
 
 class UserDataService {
   static const String baseUrl = "https://localhost:7223/api/calculation";
+  static const String userBaseUrl = "https://localhost:7223/api/user";
+
+
+  static Future<Map<String, dynamic>> getUserData(String userId) async {
+    final url = Uri.parse('$userBaseUrl/get-by-id?id=$userId');
+
+    try {
+      final response = await http.get(url);
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> responseBody = jsonDecode(response.body);
+
+        if (responseBody['success'] == true) {
+          return {
+            "success": true,
+            "message": "User data retrieved successfully",
+            "data": responseBody["data"],
+          };
+        } else {
+          return {
+            "success": false,
+            "message": responseBody["message"] ?? "Failed to retrieve user data",
+          };
+        }
+      } else {
+        return {
+          "success": false,
+          "message": "HTTP Error ${response.statusCode}",
+        };
+      }
+    } catch (e) {
+      print('Exception in getUserData: $e');
+      return {
+        "success": false,
+        "message": "An error occurred during fetch: $e",
+      };
+    }
+  }
+
 
   static Future<Map<String, dynamic>> addMeasurement({
     required String userId,
@@ -112,6 +155,7 @@ class UserDataService {
     }
   }
 
+
   static Future<Map<String, dynamic>> addAnthropometry({
     required String userId,
     required DateTime measuredAt,
@@ -119,6 +163,7 @@ class UserDataService {
     required double height,
     required double sugar,
     required String bloodType,
+    int? age,
   }) async {
     final url = Uri.parse('https://localhost:7223/api/calculation/add-anthropometry');
     final body = {
@@ -128,8 +173,9 @@ class UserDataService {
       "height": height.toInt(),
       "sugar": sugar,
       "bloodType": bloodType,
+      if (age != null) "age": age,
     };
-
+    print('Anthropometry request with age: $age');
 
     try {
       final response = await http.post(
