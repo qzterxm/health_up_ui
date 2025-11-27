@@ -41,9 +41,12 @@ class _MedicationScheduleState extends State<MedicationSchedule> {
       _medicationsFuture = _service.getMedications(widget.userId);
     });
 
-    _medicationsFuture.then((meds) {
-      _updateMedicationsByDate(meds);
-    });
+    final meds = await _medicationsFuture;
+    _updateMedicationsByDate(meds);
+  }
+
+  Future<void> _onRefresh() async {
+    await _refresh();
   }
 
   String _convertDayName(String shortDayName) {
@@ -155,7 +158,7 @@ class _MedicationScheduleState extends State<MedicationSchedule> {
       }
     }
 
-    return medicationsCount > 3 || meds.length > 5;
+    return medicationsCount > 2 || meds.length > 2;
   }
 
   @override
@@ -176,13 +179,21 @@ class _MedicationScheduleState extends State<MedicationSchedule> {
             return const Center(child: CircularProgressIndicator());
           }
           if (snapshot.hasError) {
-            return Center(
-              child: Text(
-                "Error: ${snapshot.error}",
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.error,
-                ),
-              ),
+            return RefreshIndicator(
+                onRefresh: _onRefresh,
+                child: ListView(
+                    children: [
+                      SizedBox(height: MediaQuery.of(context).size.height * 0.4),
+                      Center(
+                        child: Text(
+                          "Error: ${snapshot.error}",
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.error,
+                          ),
+                        ),
+                      ),
+                    ]
+                )
             );
           }
           final meds = snapshot.data ?? [];
@@ -202,68 +213,158 @@ class _MedicationScheduleState extends State<MedicationSchedule> {
           }
           final sortedTimes = groupedMeds.keys.toList()..sort();
 
-          return Column(
-            children: [
-              Card(
-                margin: const EdgeInsets.all(16),
-                elevation: 2,
-                color: Theme.of(context).cardColor,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    children: [
-                      if (shouldCollapse)
+          return RefreshIndicator(
+            onRefresh: _onRefresh,
+            color: Theme.of(context).colorScheme.primary,
+            child: ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              children: [
+                Card(
+                  margin: const EdgeInsets.all(16),
+                  elevation: 2,
+                  color: Theme.of(context).cardColor,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      children: [
+                        if (shouldCollapse)
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              Text(
+                                _isCalendarExpanded ? 'Minimize' : 'Maximize',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Theme.of(context).colorScheme.primary,
+                                ),
+                              ),
+                              IconButton(
+                                icon: Icon(
+                                  _isCalendarExpanded
+                                      ? Icons.keyboard_arrow_up
+                                      : Icons.keyboard_arrow_down,
+                                  color: Theme.of(context).colorScheme.primary,
+                                  size: 20,
+                                ),
+                                onPressed: () {
+                                  setState(() {
+                                    _isCalendarExpanded = !_isCalendarExpanded;
+                                  });
+                                },
+                              ),
+                            ],
+                          ),
+
+                        if (showCollapsedCalendar)
+                          _buildCompactCalendar()
+                        else
+                          _buildFullCalendar(),
+
+                        const SizedBox(height: 8),
+
                         Row(
-                          mainAxisAlignment: MainAxisAlignment.end,
+                          mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Text(
-                              _isCalendarExpanded ? 'Minimize' : 'Maximize',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Theme.of(context).colorScheme.primary,
+                            Container(
+                              width: 8,
+                              height: 8,
+                              decoration: const BoxDecoration(
+                                color: Colors.green,
+                                shape: BoxShape.circle,
                               ),
                             ),
-                            IconButton(
-                              icon: Icon(
-                                _isCalendarExpanded
-                                    ? Icons.keyboard_arrow_up
-                                    : Icons.keyboard_arrow_down,
-                                color: Theme.of(context).colorScheme.primary,
-                                size: 20,
+                            const SizedBox(width: 6),
+                            Text(
+                              'Scheduled medication',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.6),
                               ),
-                              onPressed: () {
-                                setState(() {
-                                  _isCalendarExpanded = !_isCalendarExpanded;
-                                });
-                              },
                             ),
                           ],
                         ),
+                      ],
+                    ),
+                  ),
+                ),
 
-                      if (showCollapsedCalendar)
-                        _buildCompactCalendar()
-                      else
-                        _buildFullCalendar(),
 
-                      const SizedBox(height: 8),
-
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Container(
-                            width: 8,
-                            height: 8,
-                            decoration: const BoxDecoration(
-                              color: Colors.green,
-                              shape: BoxShape.circle,
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Row(
+                    children: [
+                      Text(
+                        'Medication for ${DateFormat('dd.MM.yyyy').format(_selectedDay)}',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Theme.of(context).textTheme.bodyLarge?.color,
+                        ),
+                      ),
+                      const Spacer(),
+                      if (!isSameDay(_selectedDay, DateTime.now()))
+                        TextButton(
+                          onPressed: () {
+                            setState(() {
+                              _selectedDay = DateTime.now();
+                              _focusedDay = DateTime.now();
+                            });
+                          },
+                          child: Text(
+                            'Today',
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.primary,
                             ),
                           ),
-                          const SizedBox(width: 6),
+                        ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 16),
+
+                if (meds.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 50.0),
+                    child: Center(
+                      child: Text(
+                        "No medications scheduled.\nTap '+' to add one.",
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 16, color: Colors.grey),
+                      ),
+                    ),
+                  )
+                else if (sortedTimes.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 30.0),
+                    child: Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
                           Text(
-                            'Scheduled medication',
+                            "No medications scheduled for ${DateFormat('dd.MM.yyyy').format(_selectedDay)}",
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.6),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            "Day of week: ${_convertToShortDayName(DateFormat('EEEE').format(_selectedDay))}",
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.6),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            "Active medications: ${meds.length}",
+                            textAlign: TextAlign.center,
                             style: TextStyle(
                               fontSize: 12,
                               color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.6),
@@ -271,137 +372,56 @@ class _MedicationScheduleState extends State<MedicationSchedule> {
                           ),
                         ],
                       ),
-                    ],
-                  ),
-                ),
-              ),
-
-
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Row(
-                  children: [
-                    Text(
-                      'Medication for ${DateFormat('dd.MM.yyyy').format(_selectedDay)}',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Theme.of(context).textTheme.bodyLarge?.color,
-                      ),
                     ),
-                    const Spacer(),
-                    if (!isSameDay(_selectedDay, DateTime.now()))
-                      TextButton(
-                        onPressed: () {
-                          setState(() {
-                            _selectedDay = DateTime.now();
-                            _focusedDay = DateTime.now();
-                          });
-                        },
-                        child: Text(
-                          'Today',
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.primary,
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
+                  )
+                else
 
-              const SizedBox(height: 16),
-
-
-              if (meds.isEmpty)
-                const Expanded(
-                  child: Center(
-                    child: Text(
-                      "No medications scheduled.\nTap '+' to add one.",
-                      textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 16, color: Colors.grey),
-                    ),
-                  ),
-                )
-              else if (sortedTimes.isEmpty)
-                Expanded(
-                  child: Center(
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Text(
-                          "No medications scheduled for ${DateFormat('dd.MM.yyyy').format(_selectedDay)}",
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.6),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+                          child: Row(
+                            children: [
+                              SizedBox(
+                                width: 70,
+                                child: Text(
+                                  "Time",
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16,
+                                    color: Theme.of(context).textTheme.bodyLarge?.color,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  "Medication",
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16,
+                                    color: Theme.of(context).textTheme.bodyLarge?.color,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                        const SizedBox(height: 8),
-                        Text(
-                          "Day of week: ${_convertToShortDayName(DateFormat('EEEE').format(_selectedDay))}",
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.6),
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          "Active medications: ${meds.length}",
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.6),
-                          ),
-                        ),
+                        const SizedBox(height: 12),
+                        ...sortedTimes.map((time) {
+                          final medsAtTime = groupedMeds[time]!;
+                          final bool isActive = _isTimeActive(time);
+                          return _buildTimeGroup(context, time, medsAtTime, isActive: isActive);
+                        }).toList(),
                       ],
                     ),
                   ),
-                )
-              else
-                Expanded(
-                  child: ListView(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
-                        child: Row(
-                          children: [
-                            SizedBox(
-                              width: 70,
-                              child: Text(
-                                "Time",
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16,
-                                  color: Theme.of(context).textTheme.bodyLarge?.color,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Text(
-                                "Medication",
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16,
-                                  color: Theme.of(context).textTheme.bodyLarge?.color,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      ...sortedTimes.map((time) {
-                        final medsAtTime = groupedMeds[time]!;
-                        final bool isActive = _isTimeActive(time);
-                        return _buildTimeGroup(context, time, medsAtTime, isActive: isActive);
-                      }).toList(),
-                    ],
-                  ),
-                ),
-            ],
+
+                const SizedBox(height: 80),
+              ],
+            ),
           );
         },
       ),

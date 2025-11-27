@@ -178,16 +178,24 @@ class AuthService {
     }
   }
 
+
   Future<bool> updateUser(Map<String, dynamic> user) async {
+
     final url = "https://localhost:7223/api/user/update-user";
 
     try {
+
       final response = await http.put(
         Uri.parse(url),
         headers: {"Content-Type": "application/json"},
         body: jsonEncode(user),
       );
-      return response.statusCode == 200;
+
+      if (response.statusCode == 200) {
+        return true;
+      } else {
+        return false;
+      }
     } catch (e) {
       return false;
     }
@@ -195,7 +203,6 @@ class AuthService {
 
   Future<bool> deleteUser(String id) async {
     final url = Uri.parse("$userBaseUrl/delete-user?id=$id");
-    print("DELETE URL: $url");
 
     final response = await http.delete(url);
     return response.statusCode == 200;
@@ -204,7 +211,4 @@ class AuthService {
   Future<void> logout() async {
     await clearTokens();
   }
-
-
-
 }

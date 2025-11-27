@@ -6,11 +6,11 @@ import 'package:health_up/pages/files_screen.dart';
 import 'package:health_up/pages/medication_schedule.dart';
 import 'package:health_up/pages/profile/profile_screen.dart';
 import 'package:health_up/pages/sleep_screen.dart';
-import 'package:health_up/pages/welcome_screen.dart';
+import 'package:health_up/screens/splash_screen.dart';
 import 'package:health_up/services/user_data_service.dart';
 import 'package:health_up/services/sleep_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
+import 'dart:ui';
 void main() {
   runApp(const MyApp());
 }
@@ -23,6 +23,15 @@ class MyApp extends StatefulWidget {
 
   static _MyAppState? of(BuildContext context) =>
       context.findAncestorStateOfType<_MyAppState>();
+}
+//перевірка для pc
+class AppScrollBehavior extends MaterialScrollBehavior {
+  @override
+  Set<PointerDeviceKind> get dragDevices => {
+    PointerDeviceKind.touch,
+    PointerDeviceKind.mouse,
+    PointerDeviceKind.trackpad,
+  };
 }
 
 class _MyAppState extends State<MyApp> {
@@ -50,10 +59,11 @@ class _MyAppState extends State<MyApp> {
       _themeMode = themeMode;
     });
   }
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Health App',
+      title: 'HealthUp',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         primarySwatch: Colors.blue,
@@ -137,11 +147,10 @@ class _MyAppState extends State<MyApp> {
         ),
       ),
       themeMode: _themeMode,
-      home: const WelcomeScreen(),
+      home: const SplashScreen(),
     );
   }
 }
-
 
 class MainScreen extends StatefulWidget {
   final String userId;
@@ -182,11 +191,17 @@ class _MainScreenState extends State<MainScreen> {
     _fetchSleepData();
   }
 
-  Future<void> _fetchUserData() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
+  Future<void> _fetchUserData({bool showLoading = true}) async {
+    if (showLoading) {
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
+      });
+    } else {
+      setState(() {
+        _errorMessage = null;
+      });
+    }
 
     try {
       final results = await Future.wait([
@@ -203,7 +218,8 @@ class _MainScreenState extends State<MainScreen> {
         });
       } else {
         setState(() {
-          _errorMessage = healthDataResponse["message"] ?? 'Failed to load health data';
+          _errorMessage =
+              healthDataResponse["message"] ?? 'Failed to load health data';
         });
       }
 
@@ -233,12 +249,14 @@ class _MainScreenState extends State<MainScreen> {
       } else {
         if (_errorMessage == null) {
           setState(() {
-            _errorMessage = userDataResponse["message"] ?? 'Failed to load user profile data';
+            _errorMessage =
+                userDataResponse["message"] ?? 'Failed to load user profile data';
           });
         }
       }
 
-      if (healthDataResponse["success"] != true && userDataResponse["success"] != true) {
+      if (healthDataResponse["success"] != true &&
+          userDataResponse["success"] != true) {
         setState(() {
           _errorMessage = 'Failed to load both health and profile data';
         });
@@ -248,9 +266,11 @@ class _MainScreenState extends State<MainScreen> {
         _errorMessage = 'Network error: $e';
       });
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -287,10 +307,19 @@ class _MainScreenState extends State<MainScreen> {
         _sleepStatus = "Error";
       });
     } finally {
-      setState(() {
-        _isSleepLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isSleepLoading = false;
+        });
+      }
     }
+  }
+
+  Future<void> _onRefresh() async {
+    await Future.wait([
+      _fetchUserData(showLoading: false),
+      _fetchSleepData(),
+    ]);
   }
 
   Future<void> _onReturnFromSleepPage() async {
@@ -325,13 +354,13 @@ class _MainScreenState extends State<MainScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
+              const Icon(
                 Icons.error_outline,
                 color: Colors.red,
                 size: 64,
               ),
               const SizedBox(height: 16),
-              Text(
+              const Text(
                 'Failed to load data',
                 style: TextStyle(
                   color: Colors.red,
@@ -344,7 +373,11 @@ class _MainScreenState extends State<MainScreen> {
                 _errorMessage!,
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.7),
+                  color: Theme.of(context)
+                      .textTheme
+                      .bodyMedium
+                      ?.color
+                      ?.withOpacity(0.7),
                 ),
               ),
               const SizedBox(height: 20),
@@ -372,154 +405,163 @@ class _MainScreenState extends State<MainScreen> {
     final data = _averageData!;
     final avatarImage = _getAvatarImage();
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              CircleAvatar(
-                radius: 26,
-                backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.1),
-                backgroundImage: avatarImage,
-                child: avatarImage == null
-                    ? Text(
-                  _currentUserName.isNotEmpty ? _currentUserName[0].toUpperCase() : '?',
-                  style: TextStyle(
-                    fontSize: 22,
-                    color: Theme.of(context).colorScheme.primary,
-                    fontWeight: FontWeight.bold,
-                  ),
-                )
-                    : null,
-              ),
-              const SizedBox(width: 14),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    "Welcome back,",
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.7),
-                    ),
-                  ),
-                  Text(
-                    _currentUserName,
+    return RefreshIndicator(
+      onRefresh: _onRefresh,
+      color: Theme.of(context).colorScheme.primary,
+      backgroundColor: Theme.of(context).cardColor,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                CircleAvatar(
+                  radius: 26,
+                  backgroundColor:
+                  Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                  backgroundImage: avatarImage,
+                  child: avatarImage == null
+                      ? Text(
+                    _currentUserName.isNotEmpty
+                        ? _currentUserName[0].toUpperCase()
+                        : '?',
                     style: TextStyle(
                       fontSize: 22,
+                      color: Theme.of(context).colorScheme.primary,
                       fontWeight: FontWeight.bold,
-                      color: Theme.of(context).textTheme.bodyLarge?.color,
                     ),
-                  ),
-                ],
-              )
-            ],
-          ),
-
-          const SizedBox(height: 25),
-
-          Text(
-            "Smart Health Metrics",
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w700,
-              color: Theme.of(context).textTheme.bodyLarge?.color,
+                  )
+                      : null,
+                ),
+                const SizedBox(width: 14),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      "Welcome back,",
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Theme.of(context)
+                            .textTheme
+                            .bodyMedium
+                            ?.color
+                            ?.withOpacity(0.7),
+                      ),
+                    ),
+                    Text(
+                      _currentUserName,
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        color: Theme.of(context).textTheme.bodyLarge?.color,
+                      ),
+                    ),
+                  ],
+                )
+              ],
             ),
-          ),
-          const SizedBox(height: 14),
-
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              _metricCard(
-                icon: Icons.favorite,
-                title: "Avg HR",
-                value: "${data.averageHeartRate.toStringAsFixed(1)} bpm",
+            const SizedBox(height: 25),
+            Text(
+              "Smart Health Metrics",
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+                color: Theme.of(context).textTheme.bodyLarge?.color,
               ),
-              _metricCard(
-                icon: Icons.bloodtype,
-                title: "Avg BP",
-                value: "${data.averageSystolic}/${data.averageDiastolic}",
-              ),
-              _metricCard(
-                icon: Icons.monitor_weight,
-                title: "BMI",
-                value: data.imt.toStringAsFixed(1),
-              ),
-            ],
-          ),
-          const SizedBox(height: 30),
-
-          _sleepScoreCard(),
-
-          const SizedBox(height: 30),
-
-          Text(
-            "Daily Health Stats",
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w700,
-              color: Theme.of(context).textTheme.bodyLarge?.color,
             ),
-          ),
-          const SizedBox(height: 14),
-
-          GridView.count(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            crossAxisCount: 2,
-            crossAxisSpacing: 14,
-            mainAxisSpacing: 14,
-            childAspectRatio: 1.35,
-            children: [
-              _dataCard(Icons.favorite, "Heart Rate", "${data.latestHeartRate} bpm"),
-              _dataCard(
-                Icons.bloodtype,
-                "Blood Pressure",
-                "${data.averageSystolic}/${data.averageDiastolic}",
-              ),
-              _dataCard(
-                Icons.local_drink,
-                "Sugar Level",
-                data.latestSugar > 0
-                    ? "${data.latestSugar.toStringAsFixed(1)} mmol/L"
-                    : "N/A",
-              ),
-              _addDataCard(),
-            ],
-          ),
-
-          const SizedBox(height: 30),
-
-          Text(
-            "Body Parameters",
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w700,
-              color: Theme.of(context).textTheme.bodyLarge?.color,
+            const SizedBox(height: 14),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                _metricCard(
+                  icon: Icons.favorite,
+                  title: "Avg HR",
+                  value: "${data.averageHeartRate.toStringAsFixed(1)} bpm",
+                ),
+                _metricCard(
+                  icon: Icons.bloodtype,
+                  title: "Avg BP",
+                  value: "${data.averageSystolic}/${data.averageDiastolic}",
+                ),
+                _metricCard(
+                  icon: Icons.monitor_weight,
+                  title: "BMI",
+                  value: data.imt.toStringAsFixed(1),
+                ),
+              ],
             ),
-          ),
-          const SizedBox(height: 14),
-
-          GridView.count(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            crossAxisCount: 2,
-            crossAxisSpacing: 14,
-            mainAxisSpacing: 14,
-            childAspectRatio: 1.35,
-            children: [
-              _dataCard(Icons.height, "Height", "${data.latestHeight} cm"),
-              _dataCard(Icons.monitor_weight, "Weight", "${data.latestWeight} kg"),
-              _dataCard(Icons.bloodtype, "Blood Group",
-                  data.bloodGroup.isEmpty ? "N/A" : data.bloodGroup),
-              _dataCard(Icons.cake_outlined, "Age",
-                  _userAge != null && _userAge! > 0 ? "$_userAge years" : "N/A"),
-            ],
-          ),
-        ],
+            const SizedBox(height: 30),
+            _sleepScoreCard(),
+            const SizedBox(height: 30),
+            Text(
+              "Daily Health Stats",
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+                color: Theme.of(context).textTheme.bodyLarge?.color,
+              ),
+            ),
+            const SizedBox(height: 14),
+            GridView.count(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              crossAxisCount: 2,
+              crossAxisSpacing: 14,
+              mainAxisSpacing: 14,
+              childAspectRatio: 1.35,
+              children: [
+                _dataCard(Icons.favorite, "Heart Rate",
+                    "${data.latestHeartRate} bpm"),
+                _dataCard(
+                  Icons.bloodtype,
+                  "Blood Pressure",
+                  "${data.averageSystolic}/${data.averageDiastolic}",
+                ),
+                _dataCard(
+                  Icons.local_drink,
+                  "Sugar Level",
+                  data.latestSugar > 0
+                      ? "${data.latestSugar.toStringAsFixed(1)} mmol/L"
+                      : "N/A",
+                ),
+                _addDataCard(),
+              ],
+            ),
+            const SizedBox(height: 30),
+            Text(
+              "Body Parameters",
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+                color: Theme.of(context).textTheme.bodyLarge?.color,
+              ),
+            ),
+            const SizedBox(height: 14),
+            GridView.count(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              crossAxisCount: 2,
+              crossAxisSpacing: 14,
+              mainAxisSpacing: 14,
+              childAspectRatio: 1.35,
+              children: [
+                _dataCard(Icons.height, "Height", "${data.latestHeight} cm"),
+                _dataCard(
+                    Icons.monitor_weight, "Weight", "${data.latestWeight} kg"),
+                _dataCard(Icons.bloodtype, "Blood Group",
+                    data.bloodGroup.isEmpty ? "N/A" : data.bloodGroup),
+                _dataCard(
+                    Icons.cake_outlined,
+                    "Age",
+                    _userAge != null && _userAge! > 0
+                        ? "$_userAge years"
+                        : "N/A"),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -623,7 +665,11 @@ class _MainScreenState extends State<MainScreen> {
           Text(
             title,
             style: TextStyle(
-              color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.7),
+              color: Theme.of(context)
+                  .textTheme
+                  .bodyMedium
+                  ?.color
+                  ?.withOpacity(0.7),
               fontSize: 13,
             ),
             textAlign: TextAlign.center,
@@ -670,7 +716,11 @@ class _MainScreenState extends State<MainScreen> {
             title,
             style: TextStyle(
               fontSize: 14,
-              color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.7),
+              color: Theme.of(context)
+                  .textTheme
+                  .bodyMedium
+                  ?.color
+                  ?.withOpacity(0.7),
             ),
           ),
           const SizedBox(height: 6),
@@ -736,7 +786,7 @@ class _MainScreenState extends State<MainScreen> {
       case 0:
         return _buildHomeBody();
       case 1:
-        return const ReportsScreen();
+        return const FilesScreen();
       case 2:
         return const DoctorVisitsScreen();
       case 3:
@@ -757,7 +807,7 @@ class _MainScreenState extends State<MainScreen> {
         return const SizedBox.shrink();
       case 1:
         return Text(
-          'Files & Notes',
+          'Notes & Files ',
           style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.bold,
@@ -802,18 +852,6 @@ class _MainScreenState extends State<MainScreen> {
       appBar: AppBar(
         automaticallyImplyLeading: false,
         title: _buildAppBarTitle(),
-        actions: [
-          IconButton(
-            icon: Icon(
-              Icons.refresh,
-              color: Theme.of(context).iconTheme.color,
-            ),
-            onPressed: () {
-              _fetchUserData();
-              _fetchSleepData();
-            },
-          ),
-        ],
       ),
       body: _buildPageContent(),
       bottomNavigationBar: BottomNavigationBar(
@@ -824,9 +862,12 @@ class _MainScreenState extends State<MainScreen> {
           });
         },
         type: BottomNavigationBarType.fixed,
-        backgroundColor: Theme.of(context).bottomNavigationBarTheme.backgroundColor,
-        selectedItemColor: Theme.of(context).bottomNavigationBarTheme.selectedItemColor,
-        unselectedItemColor: Theme.of(context).bottomNavigationBarTheme.unselectedItemColor,
+        backgroundColor:
+        Theme.of(context).bottomNavigationBarTheme.backgroundColor,
+        selectedItemColor:
+        Theme.of(context).bottomNavigationBarTheme.selectedItemColor,
+        unselectedItemColor:
+        Theme.of(context).bottomNavigationBarTheme.unselectedItemColor,
         items: const [
           BottomNavigationBarItem(
             icon: Icon(Icons.home_outlined),
@@ -856,5 +897,7 @@ class _MainScreenState extends State<MainScreen> {
         ],
       ),
     );
+
   }
+
 }

@@ -95,13 +95,13 @@ class _VerificationCodeScreenState extends State<VerificationCodeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          icon: Icon(Icons.arrow_back, color: Theme.of(context).iconTheme.color),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        backgroundColor: Colors.white,
+        backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
         elevation: 0,
       ),
       body: SingleChildScrollView(
@@ -116,10 +116,10 @@ class _VerificationCodeScreenState extends State<VerificationCodeScreen> {
             ),
             const SizedBox(height: 32.0),
 
-            const Text(
+            Text(
               'Verification Code',
               style: TextStyle(
-                color: Colors.black,
+                color: Theme.of(context).textTheme.titleLarge?.color,
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
               ),
@@ -129,7 +129,10 @@ class _VerificationCodeScreenState extends State<VerificationCodeScreen> {
             Text(
               'Enter the 4-digit code we\'ve sent to ${widget.email.length > 4 ? widget.email.replaceRange(3, widget.email.indexOf('@'), '*****') : widget.email}',
               textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.grey[600], fontSize: 16),
+              style: TextStyle(
+                  color: Theme.of(context).textTheme.bodyMedium?.color,
+                  fontSize: 16
+              ),
             ),
             const SizedBox(height: 32.0),
 
@@ -144,18 +147,22 @@ class _VerificationCodeScreenState extends State<VerificationCodeScreen> {
                     keyboardType: TextInputType.number,
                     textAlign: TextAlign.center,
                     maxLength: 1,
-                    style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.black),
+                    style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: Theme.of(context).textTheme.bodyLarge?.color
+                    ),
                     decoration: InputDecoration(
                       counterText: "",
                       filled: true,
-                      fillColor: Colors.grey[100],
+                      fillColor: Theme.of(context).cardColor,
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12.0),
-                        borderSide: BorderSide(color: Colors.grey.shade300),
+                        borderSide: BorderSide(color: Theme.of(context).dividerColor),
                       ),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12.0),
-                        borderSide: BorderSide(color: Colors.grey.shade300),
+                        borderSide: BorderSide(color: Theme.of(context).dividerColor),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12.0),
@@ -182,7 +189,7 @@ class _VerificationCodeScreenState extends State<VerificationCodeScreen> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text("Didn't receive code?",
-                    style: TextStyle(color: Colors.grey[600])),
+                    style: TextStyle(color: Theme.of(context).textTheme.bodyMedium?.color)),
 
                 _isResending
                     ? const Padding(

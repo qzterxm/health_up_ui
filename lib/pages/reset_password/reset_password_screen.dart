@@ -16,17 +16,27 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      // Адаптивний фон
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          icon: Icon(
+            Icons.arrow_back,
+            // Колір іконки береться з теми
+            color: Theme.of(context).iconTheme.color,
+          ),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: const Text(
+        title: Text(
           'Reset Password',
-          style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+          style: TextStyle(
+            // Колір тексту заголовка з теми
+            color: Theme.of(context).textTheme.titleLarge?.color,
+            fontWeight: FontWeight.bold,
+          ),
         ),
-        backgroundColor: Colors.white,
+        // Фон AppBar з теми
+        backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
         elevation: 0,
         centerTitle: true,
       ),
@@ -40,11 +50,22 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
               TextField(
                 controller: _emailController,
                 keyboardType: TextInputType.emailAddress,
+                // Колір тексту, що вводить користувач
+                style: TextStyle(
+                  color: Theme.of(context).textTheme.bodyLarge?.color,
+                ),
                 decoration: InputDecoration(
                   hintText: 'Enter your email',
-                  prefixIcon: Icon(Icons.mail_outline, color: Colors.grey[600]),
+                  hintStyle: TextStyle(
+                    color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.6),
+                  ),
+                  prefixIcon: Icon(
+                    Icons.mail_outline,
+                    color: Theme.of(context).iconTheme.color?.withOpacity(0.6),
+                  ),
                   filled: true,
-                  fillColor: Colors.grey[50],
+                  // Колір фону поля вводу (сірий у світлій темі, темний у темній)
+                  fillColor: Theme.of(context).cardColor,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12.0),
                     borderSide: BorderSide.none,
@@ -55,6 +76,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
               ElevatedButton(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.blue,
+                  foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 16.0),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(30.0),
@@ -73,11 +95,9 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
 
                   setState(() => _isLoading = true);
 
-                  final result =
-                  await AuthService.requestPasswordReset(email);
+                  final result = await AuthService.requestPasswordReset(email);
 
                   setState(() => _isLoading = false);
-
 
                   if (result["success"]) {
                     Navigator.push(
@@ -89,13 +109,15 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                   }
                 },
                 child: _isLoading
-                    ? const CircularProgressIndicator(color: Colors.white)
+                    ? const SizedBox(
+                  height: 20,
+                  width: 20,
+                  child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                )
                     : const Text(
                   'Send Code',
-                  style: TextStyle(fontSize: 18, color: Colors.white),
-
+                  style: TextStyle(fontSize: 18),
                 ),
-
               ),
             ],
           ),

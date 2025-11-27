@@ -57,6 +57,10 @@ class _SleepPageState extends State<SleepPage> {
     }
   }
 
+  Future<void> _onRefresh() async {
+    await _fetchSleepData();
+  }
+
   SleepEntry? get _selectedDayData {
     final normalizedKey = DateTime.utc(
       _selectedDay.year,
@@ -175,7 +179,7 @@ class _SleepPageState extends State<SleepPage> {
 
       if (success) {
         if (mounted) {
-          Navigator.pop(context, true);
+          _fetchSleepData();
         }
       } else {
         if (mounted) {
@@ -195,7 +199,7 @@ class _SleepPageState extends State<SleepPage> {
     }
   }
 
-//todo: забрати кольори
+
   Color _getStatusColor(String status) {
     switch (status.toLowerCase()) {
       case 'excellent': return Colors.green;
@@ -235,8 +239,6 @@ class _SleepPageState extends State<SleepPage> {
       ),
     );
   }
-
-
 
   Widget _buildStatisticsCard() {
     return Card(
@@ -452,28 +454,33 @@ class _SleepPageState extends State<SleepPage> {
       appBar: AppBar(
         title: const Text("Sleep tracker"),
         centerTitle: true,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _fetchSleepData,
-          )
-        ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
+      body: RefreshIndicator(
+        onRefresh: _onRefresh,
+        color: Theme.of(context).colorScheme.primary,
+        child: _isLoading
+            ? ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
           children: [
-            _buildStatisticsCard(),
-            const SizedBox(height: 20),
-            _buildCalendar(),
-            const SizedBox(height: 20),
-            _buildDayDetails(),
-            const SizedBox(height: 20),
-            _buildAddButton(),
-            const SizedBox(height: 30),
+            SizedBox(height: MediaQuery.of(context).size.height * 0.4),
+            const Center(child: CircularProgressIndicator()),
           ],
+        )
+            : SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            children: [
+              _buildStatisticsCard(),
+              const SizedBox(height: 20),
+              _buildCalendar(),
+              const SizedBox(height: 20),
+              _buildDayDetails(),
+              const SizedBox(height: 20),
+              _buildAddButton(),
+              const SizedBox(height: 30),
+            ],
+          ),
         ),
       ),
     );

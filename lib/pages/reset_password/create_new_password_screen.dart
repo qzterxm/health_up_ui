@@ -24,19 +24,22 @@ class _CreateNewPasswordScreenState extends State<CreateNewPasswordScreen> {
   bool _isConfirmPasswordHidden = true;
   bool _isLoading = false;
 
-  final TextStyle _hintStyle =
-  TextStyle(color: Colors.grey[500], fontSize: 13);
-
   @override
   Widget build(BuildContext context) {
+    // Стиль для підказок (сірий текст під полями)
+    final TextStyle hintStyle = TextStyle(
+        color: Theme.of(context).textTheme.bodySmall?.color ?? Colors.grey[500],
+        fontSize: 13
+    );
+
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          icon: Icon(Icons.arrow_back, color: Theme.of(context).iconTheme.color),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        backgroundColor: Colors.white,
+        backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
         elevation: 0,
       ),
       body: SingleChildScrollView(
@@ -45,10 +48,10 @@ class _CreateNewPasswordScreenState extends State<CreateNewPasswordScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
-              const Text(
+              Text(
                 'Create New Password',
                 style: TextStyle(
-                  color: Colors.black,
+                  color: Theme.of(context).textTheme.titleLarge?.color,
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
                 ),
@@ -56,7 +59,10 @@ class _CreateNewPasswordScreenState extends State<CreateNewPasswordScreen> {
               const SizedBox(height: 8.0),
               Text(
                 'Enter new password below to complete the reset process',
-                style: TextStyle(color: Colors.grey[600], fontSize: 16),
+                style: TextStyle(
+                    color: Theme.of(context).textTheme.bodyMedium?.color,
+                    fontSize: 16
+                ),
               ),
               const SizedBox(height: 32.0),
 
@@ -64,18 +70,23 @@ class _CreateNewPasswordScreenState extends State<CreateNewPasswordScreen> {
               TextField(
                 controller: _passwordController,
                 obscureText: _isPasswordHidden,
-                style: const TextStyle(color: Colors.black),
+                style: TextStyle(color: Theme.of(context).textTheme.bodyLarge?.color),
                 decoration: InputDecoration(
                   labelText: 'Password',
-                  labelStyle: TextStyle(color: Colors.grey[600], fontSize: 14),
-                  prefixIcon:
-                  Icon(Icons.lock_outline, color: Colors.grey[600]),
+                  labelStyle: TextStyle(
+                      color: Theme.of(context).textTheme.bodyMedium?.color,
+                      fontSize: 14
+                  ),
+                  prefixIcon: Icon(
+                      Icons.lock_outline,
+                      color: Theme.of(context).iconTheme.color?.withOpacity(0.6)
+                  ),
                   suffixIcon: IconButton(
                     icon: Icon(
                       _isPasswordHidden
                           ? Icons.visibility_off_outlined
                           : Icons.visibility_outlined,
-                      color: Colors.grey[600],
+                      color: Theme.of(context).iconTheme.color?.withOpacity(0.6),
                     ),
                     onPressed: () {
                       setState(() {
@@ -84,7 +95,7 @@ class _CreateNewPasswordScreenState extends State<CreateNewPasswordScreen> {
                     },
                   ),
                   filled: true,
-                  fillColor: Colors.grey[50],
+                  fillColor: Theme.of(context).cardColor,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12.0),
                     borderSide: BorderSide.none,
@@ -94,7 +105,7 @@ class _CreateNewPasswordScreenState extends State<CreateNewPasswordScreen> {
               Padding(
                 padding: const EdgeInsets.only(top: 4.0, left: 12.0),
                 child: Text('Password must contain at least 6 characters',
-                    style: _hintStyle),
+                    style: hintStyle),
               ),
               const SizedBox(height: 24.0),
 
@@ -102,18 +113,23 @@ class _CreateNewPasswordScreenState extends State<CreateNewPasswordScreen> {
               TextField(
                 controller: _confirmPasswordController,
                 obscureText: _isConfirmPasswordHidden,
-                style: const TextStyle(color: Colors.black),
+                style: TextStyle(color: Theme.of(context).textTheme.bodyLarge?.color),
                 decoration: InputDecoration(
                   labelText: 'Confirm password',
-                  labelStyle: TextStyle(color: Colors.grey[600], fontSize: 14),
-                  prefixIcon:
-                  Icon(Icons.lock_outline, color: Colors.grey[600]),
+                  labelStyle: TextStyle(
+                      color: Theme.of(context).textTheme.bodyMedium?.color,
+                      fontSize: 14
+                  ),
+                  prefixIcon: Icon(
+                      Icons.lock_outline,
+                      color: Theme.of(context).iconTheme.color?.withOpacity(0.6)
+                  ),
                   suffixIcon: IconButton(
                     icon: Icon(
                       _isConfirmPasswordHidden
                           ? Icons.visibility_off_outlined
                           : Icons.visibility_outlined,
-                      color: Colors.grey[600],
+                      color: Theme.of(context).iconTheme.color?.withOpacity(0.6),
                     ),
                     onPressed: () {
                       setState(() {
@@ -122,7 +138,7 @@ class _CreateNewPasswordScreenState extends State<CreateNewPasswordScreen> {
                     },
                   ),
                   filled: true,
-                  fillColor: Colors.grey[50],
+                  fillColor: Theme.of(context).cardColor,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12.0),
                     borderSide: BorderSide.none,
@@ -131,7 +147,7 @@ class _CreateNewPasswordScreenState extends State<CreateNewPasswordScreen> {
               ),
               Padding(
                 padding: const EdgeInsets.only(top: 4.0, left: 12.0),
-                child: Text('Password must be identical', style: _hintStyle),
+                child: Text('Password must be identical', style: hintStyle),
               ),
               const SizedBox(height: 48.0),
 

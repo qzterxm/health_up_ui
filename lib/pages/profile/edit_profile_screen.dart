@@ -31,7 +31,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   late TextEditingController _phoneController;
   late TextEditingController _countryController;
   late TextEditingController _ageController;
-  late TextEditingController _passwordController;
 
   String? _selectedGender;
   bool _isSaving = false;
@@ -46,19 +45,19 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
     _fullNameController = TextEditingController(text: widget.userName);
     _emailController = TextEditingController(text: widget.userEmail);
-    _dobController = TextEditingController(
-        text: widget.userData?['dateOfBirth'] ?? "01/01/2000"
-    );
-    _phoneController = TextEditingController(
-        text: widget.userData?['phoneNumber'] ?? ""
-    );
-    _countryController = TextEditingController(
-        text: widget.userData?['country'] ?? ""
-    );
-    _ageController = TextEditingController(
-        text: widget.userData?['age']?.toString() ?? ""
-    );
-    _passwordController = TextEditingController();
+
+    String dob = widget.userData?['dateOfBirth'] ?? "2000-01-01";
+    if (dob.contains('-')) {
+      try {
+        final date = DateTime.parse(dob);
+        dob = "${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}";
+      } catch (_) {}
+    }
+
+    _dobController = TextEditingController(text: dob);
+    _phoneController = TextEditingController(text: widget.userData?['phoneNumber'] ?? "");
+    _countryController = TextEditingController(text: widget.userData?['country'] ?? "");
+    _ageController = TextEditingController(text: widget.userData?['age']?.toString() ?? "");
     _selectedGender = widget.userData?['gender'] ?? 'Male';
   }
 
@@ -70,14 +69,15 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _phoneController.dispose();
     _countryController.dispose();
     _ageController.dispose();
-    _passwordController.dispose();
     super.dispose();
   }
 
-
   String formatDateForApi(String input) {
+    if (input.contains('-')) return input;
+
     final parts = input.split('/');
     if (parts.length != 3) return input;
+
     final day = parts[0].padLeft(2, '0');
     final month = parts[1].padLeft(2, '0');
     final year = parts[2];
@@ -88,9 +88,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     try {
       final XFile? pickedFile = await _picker.pickImage(
         source: ImageSource.gallery,
-        maxWidth: 800,
-        maxHeight: 800,
-        imageQuality: 80,
+        maxWidth: 600,
+        maxHeight: 600,
+        imageQuality: 50,
       );
 
       if (pickedFile != null) {
@@ -104,6 +104,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   }
 
   ImageProvider? _getAvatarImage() {
+
     if (_selectedImageFile != null) {
       return FileImage(_selectedImageFile!);
     }
@@ -148,12 +149,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         final bytes = await _selectedImageFile!.readAsBytes();
         profilePictureValue = base64Encode(bytes);
       }
-
       final payload = {
         "id": widget.userId,
         "email": _emailController.text,
         "userName": _fullNameController.text,
-        "password": _passwordController.text.isNotEmpty ? _passwordController.text : "",
+        "password": "",
         "gender": gender,
         "age": int.tryParse(_ageController.text) ?? widget.userData?["age"] ?? 0,
         "dateOfBirth": formattedDob,
@@ -162,6 +162,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         "userRole": widget.userData?["userRole"] ?? "User",
         "profilePictureUrl": profilePictureValue,
       };
+
 
       final result = await auth.updateUser(payload);
 
@@ -186,9 +187,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   }
 
   void _showSnackBar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), duration: const Duration(seconds: 3)),
-    );
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message), duration: const Duration(seconds: 3)),
+      );
+    }
   }
 
   Future<void> _selectDate(BuildContext context) async {
@@ -201,7 +204,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
     if (picked != null) {
       setState(() {
-        _dobController.text = "${picked.day}/${picked.month}/${picked.year}";
+        _dobController.text = "${picked.day.toString().padLeft(2, '0')}/${picked.month.toString().padLeft(2, '0')}/${picked.year}";
       });
     }
   }
@@ -217,6 +220,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       ),
       padding: const EdgeInsets.all(24.0),
       child: SingleChildScrollView(
+        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           mainAxisSize: MainAxisSize.min,
@@ -232,10 +236,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             const SizedBox(height: 24.0),
 
             Text(
-              "Personal Information",
+              "Edit Profile",
               style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                 fontWeight: FontWeight.bold,
-                color: Colors.grey[800],
+                color: Theme.of(context).textTheme.bodyLarge?.color,
               ),
             ),
             const SizedBox(height: 24.0),
@@ -290,9 +294,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 readOnly: true,
                 onTap: () => _selectDate(context)
             ),
-            const SizedBox(height: 16.0),
-
-
             const SizedBox(height: 32.0),
 
             SizedBox(
@@ -346,14 +347,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           readOnly: readOnly,
           obscureText: obscureText,
           onTap: onTap,
-          style: TextStyle(color: Colors.grey[900], fontSize: 16),
+          style: TextStyle(color: Theme.of(context).textTheme.bodyLarge?.color, fontSize: 16),
           decoration: InputDecoration(
             prefixIcon: Icon(icon, color: Colors.grey[600]),
-            suffixIcon: isEditable && !readOnly && !obscureText
-                ? Icon(Icons.edit_outlined, color: Colors.grey[400])
-                : null,
             filled: true,
-            fillColor: Colors.grey[100],
+            fillColor: Theme.of(context).cardColor,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12.0),
               borderSide: BorderSide.none,
@@ -376,7 +374,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         const SizedBox(height: 8.0),
         Container(
           decoration: BoxDecoration(
-            color: Colors.grey[100],
+            color: Theme.of(context).cardColor,
             borderRadius: BorderRadius.circular(12.0),
           ),
           child: DropdownButtonFormField<String>(

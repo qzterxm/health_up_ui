@@ -26,6 +26,8 @@ class _DoctorVisitsScreenState extends State<DoctorVisitsScreen> {
   }
 
   Future<void> _loadVisits() async {
+    if (isLoading) return;
+
     setState(() {
       isLoading = true;
       _errorMessage = null;
@@ -36,13 +38,13 @@ class _DoctorVisitsScreenState extends State<DoctorVisitsScreen> {
       final token = prefs.getString("accessToken");
 
       if (token == null) {
-        _showSnackBar("User not authenticated");
+        if (mounted) _showSnackBar("User not authenticated");
         return;
       }
 
       final userId = TokenService.getUserIdFromToken(token);
       if (userId == null) {
-        _showSnackBar("Failed to decode userId");
+        if (mounted) _showSnackBar("Failed to decode userId");
         return;
       }
 
@@ -63,18 +65,24 @@ class _DoctorVisitsScreenState extends State<DoctorVisitsScreen> {
           allUserFiles = filesResult["data"] as List<UserFile>;
         }
 
-        setState(() {
-          visits = data.map((e) => DoctorVisit.fromJson(e as Map<String, dynamic>)).toList();
-          visits.sort((a, b) => b.visitedAt.compareTo(a.visitedAt));
-        });
+        if (mounted) {
+          setState(() {
+            visits = data.map((e) => DoctorVisit.fromJson(e as Map<String, dynamic>)).toList();
+            visits.sort((a, b) => b.visitedAt.compareTo(a.visitedAt));
+          });
+        }
       } else {
-        setState(() => _errorMessage = visitsResult["message"]);
+        if (mounted) setState(() => _errorMessage = visitsResult["message"]);
       }
     } catch (e) {
-      setState(() => _errorMessage = "Error: $e");
+      if (mounted) setState(() => _errorMessage = "Error: $e");
     } finally {
-      setState(() => isLoading = false);
+      if (mounted) setState(() => isLoading = false);
     }
+  }
+
+  Future<void> _onRefresh() async {
+    await _loadVisits();
   }
 
   Future<void> _attachNoteToVisit(DoctorVisit visit) async {
@@ -136,66 +144,83 @@ class _DoctorVisitsScreenState extends State<DoctorVisitsScreen> {
           color: Theme.of(context).colorScheme.onPrimary,
         ),
       ),
-      body: Stack(
-        children: [
-          if (_errorMessage != null)
-            Center(
-              child: Text(
-                _errorMessage!,
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.error,
-                ),
-              ),
-            ),
-
-          if (visits.isEmpty && !isLoading && _errorMessage == null)
-            Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
+      body: RefreshIndicator(
+        onRefresh: _onRefresh,
+        color: Theme.of(context).colorScheme.primary,
+        child: Stack(
+          children: [
+            if (_errorMessage != null)
+              ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
                 children: [
-                  Icon(
-                    Icons.medical_services_outlined,
-                    size: 64,
-                    color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.4),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    "No doctor visits recorded yet",
-                    style: TextStyle(
-                      fontSize: 18,
-                      color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.6),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    "Tap the '+' button to add your first visit",
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.5),
+                  SizedBox(height: MediaQuery.of(context).size.height * 0.3),
+                  Center(
+                    child: Text(
+                      _errorMessage!,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.error,
+                      ),
                     ),
                   ),
                 ],
+              )
+            else if (visits.isEmpty && !isLoading)
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  return SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                      child: Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.medical_services_outlined,
+                              size: 64,
+                              color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.4),
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              "No doctor visits recorded yet",
+                              style: TextStyle(
+                                fontSize: 18,
+                                color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.6),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              "Tap the '+' button to add your first visit",
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.5),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              )
+            else
+              ListView.builder(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.all(16.0),
+                itemCount: visits.length,
+                itemBuilder: (context, index) {
+                  final visit = visits[index];
+                  return _buildVisitTile(visit);
+                },
               ),
-            ),
 
-          RefreshIndicator(
-            onRefresh: _loadVisits,
-            child: ListView.builder(
-              padding: const EdgeInsets.all(16.0),
-              itemCount: visits.length,
-              itemBuilder: (context, index) {
-                final visit = visits[index];
-                return _buildVisitTile(visit);
-              },
-            ),
-          ),
-
-          if (isLoading)
-            Container(
-              color: Theme.of(context).scaffoldBackgroundColor.withOpacity(0.7),
-              child: const Center(child: CircularProgressIndicator()),
-            ),
-        ],
+            if (isLoading && visits.isEmpty)
+              Container(
+                color: Theme.of(context).scaffoldBackgroundColor,
+                child: const Center(child: CircularProgressIndicator()),
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -290,7 +315,7 @@ class _DoctorVisitsScreenState extends State<DoctorVisitsScreen> {
                     icon: const Icon(Icons.attach_file),
                     label: const Text("Attach Note/File"),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
+                      backgroundColor: Colors.blue,
                       foregroundColor: Colors.white,
                     ),
                   ),

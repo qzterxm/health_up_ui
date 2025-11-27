@@ -9,6 +9,7 @@ class UserFile {
   final String fileName;
   final DateTime uploadedAt;
   final String? visitId;
+  final String? noteId;
   final String? contentType;
 
   UserFile({
@@ -18,6 +19,7 @@ class UserFile {
     this.contentType,
     required this.uploadedAt,
     this.visitId,
+    this.noteId,
   });
 
   factory UserFile.fromJson(Map<String, dynamic> json) {
@@ -28,6 +30,7 @@ class UserFile {
       contentType: json['contentType'] ?? '',
       uploadedAt: DateTime.parse(json['uploadedAt'] ?? DateTime.now().toIso8601String()),
       visitId: json['visitId'],
+      noteId: json['noteId'],
     );
   }
 }
@@ -36,12 +39,15 @@ class UserNote {
   final String id;
   final String userId;
   final DateTime createdAt;
+  final String noteTitle;
   final String noteText;
+
 
   UserNote({
     required this.id,
     required this.userId,
     required this.createdAt,
+    required this.noteTitle,
     required this.noteText,
   });
 
@@ -50,6 +56,7 @@ class UserNote {
       id: json['id'] ?? '',
       userId: json['userId'] ?? '',
       createdAt: DateTime.parse(json['createdAt'] ?? DateTime.now().toIso8601String()),
+      noteTitle: json['noteTitle'] ?? "",
       noteText: json['noteText'] ?? '',
     );
   }
@@ -94,14 +101,20 @@ class FileService {
     required String userId,
     required File file,
     String? visitId,
+    String? noteId,
   }) async {
     try {
-      var url = Uri.parse('$baseUrl/upload?userId=$userId');
+      final queryParams = <String, String>{'userId': userId};
       if (visitId != null && visitId.isNotEmpty) {
-        url = Uri.parse('$baseUrl/upload?userId=$userId&visitId=$visitId');
+        queryParams['visitId'] = visitId;
+      }
+      if (noteId != null && noteId.isNotEmpty) {
+        queryParams['noteId'] = noteId;
       }
 
-      var request = http.MultipartRequest('POST', url);
+      final uri = Uri.parse('$baseUrl/upload').replace(queryParameters: queryParams);
+
+      var request = http.MultipartRequest('POST', uri);
 
       request.files.add(await http.MultipartFile.fromPath(
         'file',
@@ -270,12 +283,13 @@ class NoteService {
     }
   }
 
-  static Future<Map<String, dynamic>> addNote({required String userId, required String text}) async {
+  static Future<Map<String, dynamic>> addNote({required String userId, required String title, required String text}) async {
     try {
       final url = Uri.parse("$baseUrl/add-note");
 
       final body = jsonEncode({
         "userId": userId,
+        "noteTitle": title,
         "noteText": text,
         "createdAt": DateTime.now().toIso8601String(),
       });
