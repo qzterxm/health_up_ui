@@ -17,6 +17,10 @@ class FilesScreen extends StatefulWidget {
 class _FilesScreenState extends State<FilesScreen> {
   List<UserNote> userNotes = [];
   List<UserFile> allUserFiles = [];
+  List<UserFile> get standaloneFiles => allUserFiles
+      .where((f) => (f.noteId == null || f.noteId!.isEmpty) && (f.visitId == null || f.visitId!.isEmpty))
+      .toList();
+
   bool isLoading = false;
   String? currentUserId;
 
@@ -62,12 +66,13 @@ class _FilesScreenState extends State<FilesScreen> {
             userNotes = data.map((e) => UserNote.fromJson(e as Map<String, dynamic>)).toList();
             userNotes.sort((a, b) => b.createdAt.compareTo(a.createdAt));
           } else {
-            _showSnackBar(noteResult["message"] ?? "Failed to load notes");
+            userNotes = [];
           }
 
           if (fileResult["success"] == true) {
             final data = fileResult["data"] as List<dynamic>;
             allUserFiles = data.map((e) => UserFile.fromJson(e as Map<String, dynamic>)).toList();
+            allUserFiles.sort((a, b) => b.uploadedAt.compareTo(a.uploadedAt));
           }
         });
       }
@@ -83,6 +88,68 @@ class _FilesScreenState extends State<FilesScreen> {
     await _loadData();
   }
 
+  void _showAddOptions() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (BuildContext context) {
+        return SafeArea(
+          child: Wrap(
+            children: <Widget>[
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 10.0),
+                child: Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[300],
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+              ),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.note_add, color: Colors.blue),
+                ),
+                title: const Text('Create Note'),
+                subtitle: const Text('Write a text note'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _showAddNoteDialog();
+                },
+              ),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.upload_file, color: Colors.orange),
+                ),
+                title: const Text('Upload File'),
+                subtitle: const Text('Upload PDF, Image, or Doc'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _uploadStandaloneFile();
+                },
+              ),
+              const SizedBox(height: 20),
+            ],
+          ),
+        );
+      },
+    );
+  }
 
   Future<void> _showAddNoteDialog() async {
     final TextEditingController titleController = TextEditingController();
@@ -178,6 +245,32 @@ class _FilesScreenState extends State<FilesScreen> {
     }
   }
 
+  Future<void> _uploadStandaloneFile() async {
+    if (currentUserId == null) return;
+
+    final result = await FilePicker.platform.pickFiles(type: FileType.any, allowMultiple: false);
+    if (result == null || result.files.single.path == null) return;
+
+    if (mounted) setState(() => isLoading = true);
+
+    final file = File(result.files.single.path!);
+
+    final uploadResult = await FileService.uploadFile(
+      userId: currentUserId!,
+      file: file,
+    );
+
+    if (mounted) setState(() => isLoading = false);
+
+    await _loadData();
+
+    if (uploadResult["success"] == true) {
+      _showSnackBar("File uploaded successfully");
+    } else {
+      _showSnackBar(uploadResult["message"] ?? "Upload failed");
+    }
+  }
+
   Future<void> _attachFileToNote(UserNote note) async {
     if (currentUserId == null) return;
 
@@ -270,32 +363,68 @@ class _FilesScreenState extends State<FilesScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       floatingActionButton: FloatingActionButton(
-        onPressed: _showAddNoteDialog,
+        onPressed: _showAddOptions,
         backgroundColor: Theme.of(context).colorScheme.primary,
-        child: const Icon(Icons.note_add, color: Colors.white),
+        child: const Icon(Icons.add, color: Colors.white),
       ),
       body: RefreshIndicator(
         onRefresh: _onRefresh,
         color: Theme.of(context).colorScheme.primary,
         child: Stack(
           children: [
-            if (userNotes.isEmpty && !isLoading)
+            if (userNotes.isEmpty && standaloneFiles.isEmpty && !isLoading)
               _buildEmptyState()
             else
-              ListView.builder(
+              ListView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 padding: const EdgeInsets.only(left: 16, right: 16, top: 16, bottom: 80),
-                itemCount: userNotes.length,
-                itemBuilder: (context, index) {
-                  final note = userNotes[index];
-                  return _buildNoteCard(note);
-                },
+                children: [
+
+                  if (userNotes.isNotEmpty) ...[
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8.0),
+                      child: Text(
+                        "Health Notes",
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Theme.of(context).textTheme.bodyLarge?.color,
+                        ),
+                      ),
+                    ),
+                    ...userNotes.map((note) => _buildNoteCard(note)),
+                  ],
+                  if (standaloneFiles.isNotEmpty) ...[
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8.0),
+                      child: Text(
+                        "Uploaded Files",
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Theme.of(context).textTheme.bodyLarge?.color,
+                        ),
+                      ),
+                    ),
+                    ...standaloneFiles.map((file) => Card(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      elevation: 1,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      color: Theme.of(context).cardColor,
+                      child: Padding(
+                        padding: const EdgeInsets.all(8.0),
+                        child: _buildFileTile(file),
+                      ),
+                    )),
+                    const SizedBox(height: 20),
+                  ],
+
+                ],
               ),
+
             if (isLoading)
               Container(
-                color: userNotes.isEmpty
-                    ? Theme.of(context).scaffoldBackgroundColor
-                    : Colors.black.withOpacity(0.1),
+                color: Colors.black.withOpacity(0.1),
                 child: const Center(child: CircularProgressIndicator()),
               ),
           ],
@@ -314,13 +443,13 @@ class _FilesScreenState extends State<FilesScreen> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(
-                Icons.note_alt_outlined,
+                Icons.folder_open_outlined,
                 size: 64,
                 color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.4),
               ),
               const SizedBox(height: 16),
               Text(
-                "No notes recorded yet",
+                "No files or notes yet",
                 style: TextStyle(
                   fontSize: 18,
                   color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.6),
@@ -328,7 +457,7 @@ class _FilesScreenState extends State<FilesScreen> {
               ),
               const SizedBox(height: 8),
               Text(
-                "Tap the + button to create a note",
+                "Tap the + button to add content",
                 style: TextStyle(
                   fontSize: 14,
                   color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.5),

@@ -849,7 +849,9 @@ class _MainScreenState extends State<MainScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
+      appBar: _currentIndex == 0
+          ? null
+          : AppBar(
         automaticallyImplyLeading: false,
         title: _buildAppBarTitle(),
       ),
@@ -899,5 +901,4 @@ class _MainScreenState extends State<MainScreen> {
     );
 
   }
-
 }
